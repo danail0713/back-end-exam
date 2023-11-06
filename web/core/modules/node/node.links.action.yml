@@ -8,3 +8,17 @@ node.add_page:
   title: 'Add content'
   appears_on:
     - system.admin_content
+node.add_course:
+  route_name: node.add
+  title: 'Add a course'
+  appears_on:
+    - view.courses.courses
+  route_parameters:
+    node_type: courses
+node.add_instructor:
+  route_name: node.add
+  title: 'Add an instructor'
+  appears_on:
+    - view.instructors.instructors
+  route_parameters:
+    node_type: instructor
