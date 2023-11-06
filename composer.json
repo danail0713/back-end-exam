@@ -21,6 +21,7 @@
         "drupal/core-recommended": "^10.1",
         "drupal/field_validation": "^1.1",
         "drupal/paragraphs": "^1.16",
+        "drupal/profile": "^1.7",
         "drush/drush": "^11.6"
     },
     "conflict": {

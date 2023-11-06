@@ -1,0 +1,4 @@
+administer student_enrollment configuration:
+  title: 'Administer student_enrollment configuration'
+  description: 'Optional description.'
+  restrict access: true
