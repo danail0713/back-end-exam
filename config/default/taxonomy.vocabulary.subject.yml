@@ -1,0 +1,8 @@
+uuid: 2cfd8d76-d59b-4ba6-a75e-e0929f78ec4e
+langcode: en
+status: true
+dependencies: {  }
+name: Subject
+vid: subject
+description: 'Defines the subject of a course.'
+weight: 0

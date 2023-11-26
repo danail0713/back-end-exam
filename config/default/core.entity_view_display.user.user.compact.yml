@@ -1,6 +1,6 @@
 uuid: 488755cf-9ecc-4a07-adeb-bcddb09fdaa2
 langcode: en
-status: true
+status: false
 dependencies:
   config:
     - core.entity_view_mode.user.compact
@@ -8,7 +8,39 @@ dependencies:
     - image.style.thumbnail
   module:
     - image
+    - layout_builder
+    - layout_discovery
     - user
+third_party_settings:
+  layout_builder:
+    enabled: true
+    allow_custom: false
+    sections:
+      -
+        layout_id: layout_onecol
+        layout_settings:
+          label: ''
+        components:
+          bd623e26-e37d-4a9d-96ac-3d4cd9684c92:
+            uuid: bd623e26-e37d-4a9d-96ac-3d4cd9684c92
+            region: content
+            configuration:
+              id: 'field_block:user:user:user_picture'
+              label_display: '0'
+              context_mapping:
+                entity: layout_builder.entity
+              formatter:
+                type: image
+                label: hidden
+                settings:
+                  image_link: content
+                  image_style: thumbnail
+                  image_loading:
+                    attribute: lazy
+                third_party_settings: {  }
+            weight: 0
+            additional: {  }
+        third_party_settings: {  }
 _core:
   default_config_hash: 00zr_RBdTjPjBGITD3h4c1ESQZimjdVCcHGt1trLqIY
 id: user.user.compact
@@ -20,8 +52,8 @@ content:
     type: image
     label: hidden
     settings:
-      image_style: thumbnail
       image_link: content
+      image_style: thumbnail
       image_loading:
         attribute: lazy
     third_party_settings: {  }
@@ -29,3 +61,4 @@ content:
     region: content
 hidden:
   member_for: true
+  student_profiles: true

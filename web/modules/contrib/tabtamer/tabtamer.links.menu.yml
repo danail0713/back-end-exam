@@ -1,0 +1,5 @@
+entity.tab_tamer.overview:
+  title: Tab tamers
+  parent: system.admin_structure
+  description: 'List of tab tamers to extend site functionality.'
+  route_name: entity.tab_tamer.collection

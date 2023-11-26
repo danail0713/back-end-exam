@@ -2,6 +2,8 @@ uuid: 9bc8cb4f-84d3-4e0d-9fe1-60c6b3a426c9
 langcode: en
 status: true
 dependencies:
+  config:
+    - system.menu.admin
   module:
     - node
     - user
@@ -601,18 +603,19 @@ display:
       display_extenders: {  }
       path: admin/content/node
       menu:
-        type: 'default tab'
+        type: normal
         title: Content
         description: ''
         weight: -10
+        expanded: false
         menu_name: admin
-        context: ''
+        parent: ''
+        context: '0'
       tab_options:
         type: normal
         title: Content
         description: 'Find and manage content'
         weight: -10
-        menu_name: admin
     cache_metadata:
       max-age: 0
       contexts:

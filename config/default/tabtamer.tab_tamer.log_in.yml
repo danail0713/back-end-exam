@@ -1,0 +1,27 @@
+uuid: fd2e5bbb-46cd-48e1-8b3d-93da8265852d
+langcode: en
+status: true
+dependencies: {  }
+id: log_in
+label: user.login
+tabs:
+  2:
+    label: user.login
+    link: 'Log in'
+    weight: -10
+    access: true
+  3:
+    label: student_enrollment.register_student
+    link: Register
+    weight: -9
+    access: true
+  0:
+    label: user.register
+    link: Register
+    weight: -8
+    access: false
+  1:
+    label: user.pass
+    link: 'Forgotten password'
+    weight: -7
+    access: false

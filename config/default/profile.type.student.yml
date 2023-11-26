@@ -1,0 +1,13 @@
+uuid: 50c7b1f3-91c2-4793-9870-0f5bf3ac8dc2
+langcode: en
+status: true
+dependencies: {  }
+id: student
+label: Student
+display_label: ''
+multiple: false
+registration: false
+roles:
+  student: student
+allow_revisions: false
+new_revision: false

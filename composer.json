@@ -20,8 +20,12 @@
         "drupal/core-project-message": "^10.1",
         "drupal/core-recommended": "^10.1",
         "drupal/field_validation": "^1.1",
+        "drupal/menu_per_role": "^1.5",
         "drupal/paragraphs": "^1.16",
         "drupal/profile": "^1.7",
+        "drupal/tab_manager": "^1.0",
+        "drupal/tabtamer": "^2.0@beta",
+        "drupal/webform": "^6.2",
         "drush/drush": "^11.6"
     },
     "conflict": {

@@ -1,0 +1,5 @@
+name: Add instructor
+type: module
+description: Adds a buttton for adding an instructor to the educational system.
+package: Custom
+core_version_requirement: ^9 || ^10

@@ -1,0 +1,18 @@
+student_enrollment.register_student:
+  path: '/user/register'
+  defaults:
+    _title: 'Register'
+    _form: 'Drupal\student_enrollment\Form\RegisterStudentForm'
+  requirements:
+    _permission: 'access content'
+
+student_enrollment.enroll:
+  path: '/enroll/{course_id}'
+  defaults:
+    _title: 'Enroll for the course'
+    _form: 'Drupal\student_enrollment\Form\StudentEnrollmentForm'
+  requirements:
+    _permission: 'enroll for a course'
+  options:
+    parameters:
+      course_id: \d+

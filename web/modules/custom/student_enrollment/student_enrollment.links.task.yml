@@ -1,0 +1,4 @@
+student_enrollment.register_student:
+  route_name: student_enrollment.register_student
+  base_route: user.page
+  title: 'Register'

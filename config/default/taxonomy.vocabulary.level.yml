@@ -1,0 +1,8 @@
+uuid: 17a9da86-3aa4-4c37-88dc-f215e8bd6616
+langcode: en
+status: true
+dependencies: {  }
+name: Level
+vid: level
+description: 'Defines the level of a course.'
+weight: 0

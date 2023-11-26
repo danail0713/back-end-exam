@@ -1,6 +1,63 @@
 <?php
 
+use Drupal\ckeditor5\Plugin\CKEditor4To5Upgrade\Core;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\Element\Url;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\TypedData\Plugin\DataType\Uri;
+use Drupal\Core\Url as CoreUrl;
+
 /**
- * @file
- * Primary module hooks for Student Enrollment module.
+ * Implements hook_schema().
  */
+function student_enrollment_schema() {
+  $schema['student_enrollments'] = [
+    'description' => 'Table for storing student enrollments in courses.',
+    'fields' => [
+      'id' => [
+        'type' => 'serial',
+        'not null' => true,
+        'description' => 'Primary Key: Unique enrollment ID.',
+      ],
+      'user_id' => [
+        'type' => 'int',
+        'not null' => true,
+        'description' => 'User ID of the enrolled user.',
+      ],
+      'course_id' => [
+        'type' => 'int',
+        'not null' => true,
+        'description' => 'Course ID of the enrolled course.',
+      ],
+      'created' => [
+        'type' => 'datetime',
+        'not null' => true,
+        'description' => 'Timestamp of when the enrollment was created.',
+      ],
+    ],
+    'primary key' => ['id'],
+    'indexes' => [
+      'created' => ['created'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function student_enrollment_form_user_login_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Add reset password link.
+  $url_object = CoreUrl::fromRoute('user.pass');
+  $form['password_reset_link'] = [
+    '#type' => 'link',
+    '#url' => $url_object,
+    '#title' => new TranslatableMarkup('Forgotten your password?'),
+    '#attributes' => [
+      'class' => ['user-reset-password-link'],
+    ],
+  ];
+}
+
+

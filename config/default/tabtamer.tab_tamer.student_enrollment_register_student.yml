@@ -1,0 +1,27 @@
+uuid: 2e6d366d-0062-414c-a29d-a72a06079f83
+langcode: en
+status: true
+dependencies: {  }
+id: student_enrollment_register_student
+label: student_enrollment.register_student
+tabs:
+  3:
+    label: user.login
+    link: 'Log in'
+    weight: -10
+    access: true
+  0:
+    label: student_enrollment.register_student
+    link: Register
+    weight: -9
+    access: true
+  1:
+    label: user.register
+    link: 'Create new account'
+    weight: -8
+    access: false
+  2:
+    label: user.pass
+    link: 'Reset your password'
+    weight: -7
+    access: false

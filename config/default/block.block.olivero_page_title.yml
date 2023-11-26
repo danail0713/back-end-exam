@@ -2,6 +2,8 @@ uuid: 0d41a0bd-dd87-432f-b097-5b6a4cbf40b4
 langcode: en
 status: true
 dependencies:
+  module:
+    - node
   theme:
     - olivero
 _core:
@@ -14,7 +16,14 @@ provider: null
 plugin: page_title_block
 settings:
   id: page_title_block
-  label: 'Page title'
-  label_display: '0'
+  label: 'Available courses'
+  label_display: visible
   provider: core
-visibility: {  }
+visibility:
+  'entity_bundle:node':
+    id: 'entity_bundle:node'
+    negate: false
+    context_mapping:
+      node: '@node.node_route_context:node'
+    bundles:
+      courses: courses

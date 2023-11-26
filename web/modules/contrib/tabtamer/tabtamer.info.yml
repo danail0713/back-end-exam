@@ -1,0 +1,11 @@
+name: Tab tamer
+type: module
+description: 'Provides a tab tamer configuration entity.'
+package: Custom
+core_version_requirement: ^8 || ^9 || ^10
+configure: entity.tab_tamer.collection
+
+# Information added by Drupal.org packaging script on 2022-06-17
+version: '2.0.0-beta2'
+project: 'tabtamer'
+datestamp: 1655458210

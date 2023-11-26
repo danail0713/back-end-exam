@@ -1,0 +1,9 @@
+uuid: 54018615-9541-4727-a7f8-84a5e10ab0fe
+langcode: en
+status: true
+dependencies: {  }
+name: node_courses
+label: 'node courses validation'
+entity_type: node
+bundle: courses
+field_validation_rules: {  }

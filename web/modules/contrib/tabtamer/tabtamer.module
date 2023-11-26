@@ -1,0 +1,89 @@
+<?php
+
+/**
+ * @file
+ * Primary module hooks for Tab tamer module.
+ *
+ * @DCG
+ * This file is no longer required in Drupal 8.
+ * @see https://www.drupal.org/node/2217931
+ */
+
+use Drupal\Core\Access\AccessResultAllowed;
+use Drupal\Core\Access\AccessResultForbidden;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+use Drupal\tabtamer\Entity\TabTamer;
+use Drupal\tabtamer\TabTamerInterface;
+
+/**
+ * Implements hook_help().
+ */
+function tabtamer_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.tabtamer':
+      $text = file_get_contents(dirname(__FILE__) . '/README.txt');
+      if (!\Drupal::moduleHandler()->moduleExists('markdown')) {
+        return '<pre>' . $text . '</pre>';
+      }
+      else {
+        // Use the Markdown filter to render the README.
+        $filter_manager = \Drupal::service('plugin.manager.filter');
+        $settings = \Drupal::configFactory()->get('markdown.settings')->getRawData();
+        $config = ['settings' => $settings];
+        $filter = $filter_manager->createInstance('markdown', $config);
+        return $filter->process($text, 'en');
+      }
+  }
+  return NULL;
+}
+
+/**
+ * Implements hook_menu_local_tasks_alter().
+ */
+function tabtamer_menu_local_tasks_alter(&$data, $route_name, RefinableCacheableDependencyInterface &$cacheability) {
+
+  $currentUser = \Drupal::currentUser();
+  $tabTamer = TabTamer::getByRoute($route_name);
+  $tabTamerAdminTab = [
+    '#theme' => 'menu_local_task',
+    '#active' => FALSE,
+    '#weight' => 101,
+    '#access' => AccessResultAllowed::allowed(),
+    '#link' => [
+      'title' => t('Add tabtamer'),
+      'url' => Url::fromRoute('entity.tab_tamer.add_form', [], ['query' => ['route' => $route_name]]),
+    ],
+  ];
+
+  if ($tabTamer instanceof TabTamerInterface) {
+    $cacheability->addCacheTags($tabTamer->getCacheTags());
+
+    if ($tabTamer->status()) {
+      foreach ($data['tabs'] as &$tabs) {
+        $tabTamerTabs = $tabTamer->getTabs();
+
+        foreach ($tabTamerTabs as $setting) {
+          $key = $setting['label'];
+          if (isset($tabs[$key])) {
+            $tabs[$key]['#weight'] = $setting['weight'];
+            $tabs[$key]['#link']['title'] = $setting['link'];
+            if (!$setting['access']) {
+              $tabs[$key]['#access'] = AccessResultForbidden::forbidden('Access forbidden by tabtamer module.');
+            }
+          }
+        }
+      }
+    }
+
+    $tabTamerAdminTab['#link'] = [
+      'title' => t('Edit tabtamer'),
+      'url' => $tabTamer->toUrl(),
+    ];
+  }
+  if ($currentUser->hasPermission('administer tab_tamer')) {
+    $data['tabs'][0]['tabtamer'] = $tabTamerAdminTab;
+  }
+
+}

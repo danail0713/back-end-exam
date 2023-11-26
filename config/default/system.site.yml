@@ -2,7 +2,7 @@ _core:
   default_config_hash: VDJxTZtQR21qB4lvOq8zszJZLvLKrSPQpdn2E3T71Ww
 langcode: en
 uuid: 8b7febb0-0be0-4211-8cc5-7796755ae3c7
-name: 'Drush Site-Install'
+name: 'Educational Content Management System'
 mail: admin@example.com
 slogan: ''
 page:
@@ -12,3 +12,4 @@ page:
 admin_compact_mode: false
 weight_select_max: 100
 default_langcode: en
+mail_notification: ''

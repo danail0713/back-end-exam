@@ -1,0 +1,19 @@
+uuid: 6b2fe535-84f8-45b2-809b-ea84031678f2
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_name
+    - node.type.instructor
+id: node.instructor.field_name
+field_name: field_name
+entity_type: node
+bundle: instructor
+label: Name
+description: ''
+required: true
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: string

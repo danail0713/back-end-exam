@@ -1,0 +1,15 @@
+uuid: f4639bef-7c03-4a98-afd5-a380e89dda1a
+langcode: en
+status: true
+dependencies:
+  module:
+    - profile
+    - student_enrollment
+id: student
+label: Student
+weight: 4
+is_admin: null
+permissions:
+  - 'enroll for a course'
+  - 'update own student profile'
+  - 'view own student profile'

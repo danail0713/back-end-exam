@@ -1,0 +1,27 @@
+uuid: cddb9863-9ff5-44be-a4d2-69984ac3426d
+langcode: en
+status: true
+dependencies: {  }
+id: user_pa
+label: user.pass
+tabs:
+  -
+    label: student_enrollment.register_student
+    link: Register
+    weight: -10
+    access: false
+  -
+    label: user.register
+    link: 'Create new account'
+    weight: -10
+    access: false
+  -
+    label: user.pass
+    link: 'Reset your password'
+    weight: -10
+    access: false
+  -
+    label: user.login
+    link: 'Log in'
+    weight: -10
+    access: false

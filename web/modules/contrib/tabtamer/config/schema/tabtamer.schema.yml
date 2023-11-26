@@ -1,0 +1,33 @@
+tabtamer.tab_tamer.*:
+  type: config_entity
+  label: Tab tamer
+  mapping:
+    id:
+      type: string
+      label: ID
+    label:
+      type: label
+      label: Label
+    status:
+      type: boolean
+      label: 'Status'
+    tabs:
+      type: sequence
+      sequence:
+        type: mapping
+        mapping:
+          id:
+            type: string
+          label:
+            type: string
+            label: Label
+          link:
+            type: string
+            label: 'Link name'
+          weight:
+            type: integer
+            label: 'Weight'
+          access:
+            type: boolean
+            label: 'Access'
+

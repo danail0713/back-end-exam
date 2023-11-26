@@ -1,0 +1,7 @@
+student_enrollment.enroll_course:
+  route_name: student_enrollment.enroll
+  title: Enroll
+  appears_on:
+    - entity.node.canonical
+  class: 'Drupal\student_enrollment\Plugin\Menu\LocalAction\EnrollCourseAddLocalAction'
+

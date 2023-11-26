@@ -1,0 +1,21 @@
+uuid: 615b93ca-d391-44d4-87d1-f8e7c90b1a68
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_end_date
+    - node.type.courses
+  module:
+    - datetime
+id: node.courses.field_end_date
+field_name: field_end_date
+entity_type: node
+bundle: courses
+label: 'End date'
+description: ''
+required: true
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: datetime

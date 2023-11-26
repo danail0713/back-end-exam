@@ -2,13 +2,16 @@ uuid: 2f5958f1-c95b-40fd-b9bd-e4c3d8a2344b
 langcode: en
 status: true
 dependencies:
+  module:
+    - node
+    - user
   theme:
     - olivero
 _core:
   default_config_hash: Q9_2whdOj1YIomfvsIfopROW4FT_X5pY0DjdOiOaQ5U
 id: olivero_primary_admin_actions
 theme: olivero
-region: highlighted
+region: sidebar
 weight: -5
 provider: null
 plugin: local_actions_block
@@ -17,4 +20,18 @@ settings:
   label: 'Primary admin actions'
   label_display: '0'
   provider: core
-visibility: {  }
+visibility:
+  'entity_bundle:node':
+    id: 'entity_bundle:node'
+    negate: false
+    context_mapping:
+      node: '@node.node_route_context:node'
+    bundles:
+      courses: courses
+  user_role:
+    id: user_role
+    negate: false
+    context_mapping:
+      user: '@user.current_user_context:current_user'
+    roles:
+      student: student

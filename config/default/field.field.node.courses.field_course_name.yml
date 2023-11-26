@@ -1,0 +1,24 @@
+uuid: ffe8b6d6-0d01-47de-9b85-9556de10b5e4
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_course_name
+    - filter.format.plain_text
+    - node.type.courses
+  module:
+    - text
+id: node.courses.field_course_name
+field_name: field_course_name
+entity_type: node
+bundle: courses
+label: 'Course name'
+description: ''
+required: true
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  allowed_formats:
+    - plain_text
+field_type: text

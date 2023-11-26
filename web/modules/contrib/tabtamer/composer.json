@@ -1,0 +1,19 @@
+{
+  "name": "drupal/tabtamer",
+  "type": "drupal-module",
+  "description": "Tab Tamer is an administration utility that provides easy re-ordering, hiding, and deactivation of tabs and subtabs. You can also rename tab labels. Tab Tamer makes use of Drupal's drag ordering, but degrades gracefully when javascript is disabled. Tab Tamer utilizes Drupal's cache system to help conserve server resources.",
+  "keywords": ["Drupal"],
+  "license": "GPL-2.0+",
+  "homepage": "https://www.drupal.org/project/tabtamer",
+  "authors": [
+    {
+      "name": "Szczepan Musial",
+      "homepage": "https://www.drupal.org/u/lamp5",
+      "role": "Maintainer"
+    }
+  ],
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/tabtamer",
+    "source": "http://cgit.drupalcode.org/tabtamer"
+  }
+}

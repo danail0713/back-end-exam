@@ -1,0 +1,5 @@
+entity.tab_tamer.add_form:
+  route_name: 'entity.tab_tamer.add_form'
+  title: 'Add tab tamer'
+  appears_on:
+    - entity.tab_tamer.collection

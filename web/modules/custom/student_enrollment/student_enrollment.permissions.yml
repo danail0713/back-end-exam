@@ -1,4 +1,4 @@
-administer student_enrollment configuration:
-  title: 'Administer student_enrollment configuration'
-  description: 'Optional description.'
+enroll for a course:
+  title: 'Enroll for a course'
+  description: 'Allows students to enroll for a course.'
   restrict access: true

@@ -1,0 +1,80 @@
+uuid: 163cf99e-51b1-4eb6-bc5e-5cea687e0480
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.profile.student.field_first_name
+    - field.field.profile.student.field_last_name
+    - field.field.profile.student.field_mobile_number
+    - field.field.profile.student.layout_builder__layout
+    - profile.type.student
+  module:
+    - layout_builder
+    - layout_discovery
+third_party_settings:
+  layout_builder:
+    enabled: true
+    allow_custom: false
+    sections:
+      -
+        layout_id: layout_onecol
+        layout_settings:
+          label: ''
+        components:
+          6d3fae62-c72f-4429-bcef-90b09cb8f40a:
+            uuid: 6d3fae62-c72f-4429-bcef-90b09cb8f40a
+            region: content
+            configuration:
+              id: 'field_block:profile:student:field_first_name'
+              label_display: '0'
+              context_mapping:
+                entity: layout_builder.entity
+              formatter:
+                type: string
+                label: above
+                settings:
+                  link_to_entity: false
+                third_party_settings: {  }
+            weight: 0
+            additional: {  }
+          58572755-37ce-489a-95d6-b4d70ac51b17:
+            uuid: 58572755-37ce-489a-95d6-b4d70ac51b17
+            region: content
+            configuration:
+              id: 'field_block:profile:student:field_last_name'
+              label_display: '0'
+              context_mapping:
+                entity: layout_builder.entity
+              formatter:
+                type: string
+                label: above
+                settings:
+                  link_to_entity: false
+                third_party_settings: {  }
+            weight: 1
+            additional: {  }
+        third_party_settings: {  }
+id: profile.student.default
+targetEntityType: profile
+bundle: student
+mode: default
+content:
+  field_first_name:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 0
+    region: content
+  field_last_name:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 1
+    region: content
+hidden:
+  field_mobile_number: true
+  layout_builder__layout: true

@@ -1,0 +1,31 @@
+entity.tab_tamer.collection:
+  path: '/admin/structure/tab-tamer'
+  defaults:
+    _entity_list: 'tab_tamer'
+    _title: 'Tab tamer configuration'
+  requirements:
+    _permission: 'administer tab_tamer'
+
+entity.tab_tamer.add_form:
+  path: '/admin/structure/tab_tamer/add'
+  defaults:
+    _entity_form: 'tab_tamer.add'
+    _title: 'Add a tab tamer'
+  requirements:
+    _permission: 'administer tab_tamer'
+
+entity.tab_tamer.edit_form:
+  path: '/admin/structure/tab-tamer/{tab_tamer}'
+  defaults:
+    _entity_form: 'tab_tamer.edit'
+    _title: 'Edit a tab tamer'
+  requirements:
+    _permission: 'administer tab_tamer'
+
+entity.tab_tamer.delete_form:
+  path: '/admin/structure/tab-tamer/{tab_tamer}/delete'
+  defaults:
+    _entity_form: 'tab_tamer.delete'
+    _title: 'Delete a tab tamer'
+  requirements:
+    _permission: 'administer tab_tamer'

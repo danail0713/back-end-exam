@@ -1,0 +1,5 @@
+name: Add course
+type: module
+description: Adds a buttton for adding a course to the educational system.
+package: Custom
+core_version_requirement: ^9 || ^10

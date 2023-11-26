@@ -1,0 +1,8 @@
+uuid: 439235d2-f5e9-4ed2-8144-9271e7a1bb85
+langcode: en
+status: true
+dependencies: {  }
+name: Department
+vid: department
+description: 'Defines the department of the subject'
+weight: 0
