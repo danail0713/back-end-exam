@@ -1,0 +1,10 @@
+{# enrolled-courses-dashboard.html.twig #}
+
+<h2>My enrolled courses</h2>
+{% if courses %}
+	{% for course in courses %}
+			<h3>{{ course.label }}</h3>
+	{% endfor %}
+{% else %}
+	<p>No enrolled courses found.</p>
+{% endif %}

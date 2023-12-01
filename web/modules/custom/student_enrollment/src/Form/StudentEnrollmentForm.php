@@ -27,7 +27,7 @@ class StudentEnrollmentForm extends FormBase {
     $course_name = Node::load($course_id)->label();
     $form['course'] = [
       '#type' => 'label',
-      '#title' => $this->t('Enroll for the ' . $course_name . ' course'),
+      '#title' => $this->t('<h2>Enroll for the ' . $course_name . ' course</h2>'),
     ];
     $form['course_id'] = [
       '#type' => 'hidden',

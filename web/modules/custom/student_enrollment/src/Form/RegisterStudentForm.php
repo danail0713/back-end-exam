@@ -111,7 +111,7 @@ class RegisterStudentForm extends FormBase {
       ->save();
     // Create a new student profile.
     $profile = Profile::create([
-      'type' => 'student', // Replace with the actual profile type machine name.
+      'type' => 'student',
       'uid' => $user->id(),
       'field_first_name' => $first_name,
       'field_last_name' => $last_name,

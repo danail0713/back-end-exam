@@ -61,3 +61,14 @@ function student_enrollment_form_user_login_form_alter(&$form, FormStateInterfac
 }
 
 
+
+/**
+ * Implements hook_theme().
+ */
+function student_enrollment_theme() {
+  return [
+    'enrolled-courses-dashboard' => [
+      'variables' => ['courses' => NULL],
+    ],
+  ];
+}
