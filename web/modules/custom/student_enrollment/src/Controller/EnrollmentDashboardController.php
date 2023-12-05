@@ -12,6 +12,7 @@ class EnrollmentDashboardController extends ControllerBase {
    * Builds the response.
    */
   public function build() {
+    \drupal_flush_all_caches();
     $current_user = \Drupal::currentUser();
     // Query to fetch enrolled course IDs for the current user.
     // Replace 'student_enrollments' with your actual table/entity storing enrollment data.
@@ -23,13 +24,11 @@ class EnrollmentDashboardController extends ControllerBase {
 
     // Load enrolled courses based on the IDs.
     $enrolled_courses = $this->entityTypeManager()->getStorage('node')->loadMultiple($enrolled_course_ids);
-
     // Display enrolled courses in the dashboard.
     $build = [
       '#theme' => 'enrolled-courses-dashboard',
       '#courses' => $enrolled_courses
     ];
-
     return $build;
   }
 }

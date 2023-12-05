@@ -68,8 +68,8 @@ definitions:
     enabled: true
     expanded: false
   user__logout:
-    weight: -49
+    weight: -48
     menu_name: account
     parent: ''
-    expanded: false
     enabled: true
+    expanded: false

@@ -61,7 +61,7 @@ class StudentEnrollmentForm extends FormBase {
       $this->recordEnrollment($uid, $course_id);
       $this->messenger()->addMessage($this->t('Enrollment successful.'));
     } else {
-      $this->messenger()->addMessage($this->t('You are already enrolled in this course.'), 'warning');
+      $this->messenger()->addMessage($this->t('You are already enrolled for this course.'), 'warning');
     }
 
     // Redirect the user back to the dashboard.
