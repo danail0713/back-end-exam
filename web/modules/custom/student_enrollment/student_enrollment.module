@@ -1,10 +1,7 @@
 <?php
 
-use Drupal\ckeditor5\Plugin\CKEditor4To5Upgrade\Core;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element\Url;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\TypedData\Plugin\DataType\Uri;
 use Drupal\Core\Url as CoreUrl;
 
 /**
@@ -12,7 +9,7 @@ use Drupal\Core\Url as CoreUrl;
  */
 function student_enrollment_schema() {
   $schema['student_enrollments'] = [
-    'description' => 'Table for storing student enrollments in courses.',
+    'description' => 'Table for storing student enrollments for courses.',
     'fields' => [
       'id' => [
         'type' => 'serial',
@@ -53,7 +50,7 @@ function student_enrollment_form_user_login_form_alter(&$form, FormStateInterfac
   $form['password_reset_link'] = [
     '#type' => 'link',
     '#url' => $url_object,
-    '#title' => new TranslatableMarkup('Forgotten your password?'),
+    '#title' => new TranslatableMarkup('Forgot your password?'),
     '#attributes' => [
       'class' => ['user-reset-password-link'],
     ],
@@ -69,6 +66,18 @@ function student_enrollment_theme() {
   return [
     'enrolled-courses-dashboard' => [
       'variables' => ['courses' => NULL],
+    ],
+    'enrollmentsTable' => [
+      'variables' => ['enrollments' => NULL],
+    ],
+    'most-recent-courses' => [
+      'variables' => ['courses' => NULL],
+    ],
+    'most-enrolled-courses' => [
+      'variables' => ['courses' => NULL],
+    ],
+    'sorted-users-by-enrolled-courses' => [
+      'variables' => ['users' => NULL],
     ],
   ];
 }

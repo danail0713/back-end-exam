@@ -1,0 +1,4 @@
+<h1>Most enrolled courses</h1>
+  {% for course in courses %}
+    <h3>{{course.name}} - {{course.count_enrolled}} times enrolled</h3>
+  {% endfor %}

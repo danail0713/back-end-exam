@@ -1,0 +1,5 @@
+name: Resourse block
+type: module
+description: This block shows the related resourses for each course on the course page.
+package: Custom
+core_version_requirement: ^9 || ^10

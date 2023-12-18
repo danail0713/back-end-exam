@@ -1,0 +1,5 @@
+name: add_resourse
+type: module
+description: Adds resourses to a given course in the educational system.
+package: Custom
+core_version_requirement: ^9 || ^10

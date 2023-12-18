@@ -1,0 +1,6 @@
+<h1>Most recent courses</h1>
+{% for course in courses %}
+	<a href="{{url('entity.node.canonical',{'node': course.id})}}">
+		<h3>{{course.label}}</h3>
+	</a>
+{% endfor %}

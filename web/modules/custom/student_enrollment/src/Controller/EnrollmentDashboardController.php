@@ -12,7 +12,6 @@ class EnrollmentDashboardController extends ControllerBase {
    * Builds the response.
    */
   public function build() {
-    \drupal_flush_all_caches();
     $current_user = \Drupal::currentUser();
     // Query to fetch enrolled course IDs for the current user.
     // Replace 'student_enrollments' with your actual table/entity storing enrollment data.

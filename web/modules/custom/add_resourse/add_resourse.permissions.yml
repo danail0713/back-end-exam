@@ -1,0 +1,4 @@
+upload resourses to courses:
+  title: 'Upload resourses to courses'
+  description: 'Provides permission to add resourses to the courses.'
+  restrict access: true

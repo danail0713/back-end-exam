@@ -24,3 +24,43 @@ student_enrollment.dashboard:
     _controller: '\Drupal\student_enrollment\Controller\EnrollmentDashboardController::build'
   requirements:
     _permission: 'enroll for a course'
+
+student_enrollment.enrollments:
+  path: '/admin/content/student-enrollments'
+  defaults:
+    _title: 'Example'
+    _controller: '\Drupal\student_enrollment\Controller\EnrollmentsController::build'
+  requirements:
+    _permission: 'view all student enrollments'
+
+student_enrollment.most_recent_courses:
+  path: '/most-recent-courses'
+  defaults:
+    _title: 'Most recent courses'
+    _controller: '\Drupal\student_enrollment\Controller\MostRecentCoursesController::build'
+  requirements:
+    _permission: 'access content'
+
+student_enrollment.most_enrolled_courses:
+  path: '/most-enrolled-courses'
+  defaults:
+    _title: 'Most enrolled courses'
+    _controller: '\Drupal\student_enrollment\Controller\MostEnrolledCoursesController::build'
+  requirements:
+    _permission: 'access content'
+
+sorted-users-by-enrolled-courses:
+  path: '/sorted-users-by-enrolled-courses'
+  defaults:
+    _title: 'Example'
+    _controller: '\Drupal\student_enrollment\Controller\SortedUsersByEnrolledCoursesController::build'
+  requirements:
+    _permission: 'access content'
+
+/configure-emails-notification:
+  path: '/configure-emails-notification'
+  defaults:
+    _title: 'Configure notification emails'
+    _form: 'Drupal\student_enrollment\Form\NotificationConfigurationForm'
+  requirements:
+    _permission: 'access content'

@@ -2,3 +2,7 @@ enroll for a course:
   title: 'Enroll for a course'
   description: 'Allows students to enroll for a course.'
   restrict access: true
+view all student enrollments:
+  title: 'View all student enrollments'
+  description: 'Allows administrators to view and manage student enrollments.'
+  restrict access: true

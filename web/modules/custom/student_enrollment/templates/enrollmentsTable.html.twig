@@ -1,0 +1,30 @@
+<style>
+	table,
+	td,
+	th {
+		border: 1px solid black;
+		border-collapse: collapse;
+		width: 70%;
+	}
+</style>
+<table>
+	<caption>
+		<h3>Student Enrollments</h3>
+	</caption>
+	<thead>
+		<tr>
+			<th>Student names</th>
+			<th>Course name</th>
+			<th>Enrollment time</th>
+		</tr>
+	</thead>
+	<tbody>
+		{% for enrollment in enrollments %}
+			<tr>
+				<td>{{ enrollment.student_name }}</td>
+				<td>{{ enrollment.course_name }}</td>
+				<td>{{ enrollment.enrollment_time }}</td>
+			</tr>
+		{% endfor %}
+	</tbody>
+</table>

@@ -1,0 +1,7 @@
+add_resourse.resourse:
+  path: '/admin/content/add-resourse'
+  defaults:
+    _title: 'Add resourse'
+    _form: 'Drupal\add_resourse\Form\AddResourseForm'
+  requirements:
+    _permission: 'upload resourses to courses'
