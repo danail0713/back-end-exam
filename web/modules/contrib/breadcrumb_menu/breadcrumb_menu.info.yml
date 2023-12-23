@@ -1,0 +1,9 @@
+name: Breadcrumb Menu
+type: module
+description: Alters the breadcrumb trail so it uses menu link titles (if available) instead of page titles.
+core_version_requirement: ^8 || ^9 || ^10
+
+# Information added by Drupal.org packaging script on 2022-11-18
+version: '8.x-1.3'
+project: 'breadcrumb_menu'
+datestamp: 1668775270

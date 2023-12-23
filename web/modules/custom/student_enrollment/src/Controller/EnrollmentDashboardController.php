@@ -3,6 +3,8 @@
 namespace Drupal\student_enrollment\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
+use Drupal\node\Entity\Node;
+
 /**
  * Returns responses for Student Enrollment routes.
  */
@@ -22,7 +24,7 @@ class EnrollmentDashboardController extends ControllerBase {
     $enrolled_course_ids = $query->execute()->fetchCol();
 
     // Load enrolled courses based on the IDs.
-    $enrolled_courses = $this->entityTypeManager()->getStorage('node')->loadMultiple($enrolled_course_ids);
+    $enrolled_courses = Node::loadMultiple($enrolled_course_ids);
     // Display enrolled courses in the dashboard.
     $build = [
       '#theme' => 'enrolled-courses-dashboard',

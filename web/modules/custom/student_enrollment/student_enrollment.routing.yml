@@ -7,9 +7,9 @@ student_enrollment.register_student:
     _permission: 'access content'
 
 student_enrollment.enroll:
-  path: '/enroll/{course_id}'
+  path: 'node/{course_id}/enroll'
   defaults:
-    _title: 'Enroll for the course'
+    _title: 'Enroll'
     _form: 'Drupal\student_enrollment\Form\StudentEnrollmentForm'
   requirements:
     _permission: 'enroll for a course'
@@ -18,7 +18,7 @@ student_enrollment.enroll:
       course_id: \d+
 
 student_enrollment.dashboard:
-  path: '/student-dashboard'
+  path: 'courses/student-dashboard'
   defaults:
     _title: 'Student Dashboard'
     _controller: '\Drupal\student_enrollment\Controller\EnrollmentDashboardController::build'
@@ -28,13 +28,13 @@ student_enrollment.dashboard:
 student_enrollment.enrollments:
   path: '/admin/content/student-enrollments'
   defaults:
-    _title: 'Example'
+    _title: 'Student enrollments'
     _controller: '\Drupal\student_enrollment\Controller\EnrollmentsController::build'
   requirements:
     _permission: 'view all student enrollments'
 
 student_enrollment.most_recent_courses:
-  path: '/most-recent-courses'
+  path: 'courses/most-recent-courses'
   defaults:
     _title: 'Most recent courses'
     _controller: '\Drupal\student_enrollment\Controller\MostRecentCoursesController::build'
@@ -42,7 +42,7 @@ student_enrollment.most_recent_courses:
     _permission: 'access content'
 
 student_enrollment.most_enrolled_courses:
-  path: '/most-enrolled-courses'
+  path: 'courses/most-enrolled-courses'
   defaults:
     _title: 'Most enrolled courses'
     _controller: '\Drupal\student_enrollment\Controller\MostEnrolledCoursesController::build'
@@ -50,9 +50,9 @@ student_enrollment.most_enrolled_courses:
     _permission: 'access content'
 
 sorted-users-by-enrolled-courses:
-  path: '/sorted-users-by-enrolled-courses'
+  path: 'courses/sorted-users-by-enrolled-courses'
   defaults:
-    _title: 'Example'
+    _title: 'Sorted users by enrolled courses'
     _controller: '\Drupal\student_enrollment\Controller\SortedUsersByEnrolledCoursesController::build'
   requirements:
     _permission: 'access content'

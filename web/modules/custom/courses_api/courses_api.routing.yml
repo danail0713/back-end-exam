@@ -1,0 +1,7 @@
+courses_api.api:
+  path: '/api'
+  defaults:
+    _title: 'Courses API'
+    _controller: '\Drupal\courses_api\Controller\CoursesAPIController::build'
+  requirements:
+    _permission: 'access courses api'

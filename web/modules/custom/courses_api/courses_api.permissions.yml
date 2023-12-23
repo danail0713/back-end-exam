@@ -1,0 +1,4 @@
+access courses api:
+  title: 'Access courses api'
+  description: 'Restrict access to the json representation of the courses in the educational system.'
+  restrict access: true

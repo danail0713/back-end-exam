@@ -27,16 +27,18 @@ class ResoursesBlock extends BlockBase {
     // Check if the current page is a node and of type 'courses' and whether the user is enrolled for that course to see its resourses.'
     if ($course instanceof NodeInterface && $course->getType() == 'courses' && $this->isUserEnrolled($course)) {
       $related_resources = $this->getRelatedResources($course);
-
       // Build the block content.
       $content = [
         '#theme' => 'related-resourses',
         '#resourses' => $related_resources,
       ];
-      return $content;
     } else {
-      return [];
+      $content = [
+        '#type' => 'markup',
+        '#markup' => $this->t("Resourses for this course are not available, because you aren't enrolled for it.")
+      ];
     }
+    return $content;
   }
 
   private function isUserEnrolled(NodeInterface $course) {
