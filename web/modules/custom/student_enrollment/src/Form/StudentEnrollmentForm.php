@@ -5,11 +5,25 @@ namespace Drupal\student_enrollment\Form;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\Entity\Node;
+use Drupal\student_enrollment\Services\NotificationService;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Provides a Student Enrollment form.
  */
 class StudentEnrollmentForm extends FormBase {
+
+  protected $notificationService;
+
+  public function __construct(NotificationService $notificationService) {
+    $this->notificationService = $notificationService;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('student_enrollment.notify')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -17,6 +31,7 @@ class StudentEnrollmentForm extends FormBase {
   public function getFormId() {
     return 'student_enrollment_student_enrollment';
   }
+
 
   /**
    * {@inheritdoc}
@@ -58,14 +73,13 @@ class StudentEnrollmentForm extends FormBase {
     // Check if the user is already enrolled in the selected course.
     if (!$this->isUserEnrolled($uid, $course_id)) {
       // Record the enrollment.
+      $this->notificationService->sendEnrollmentNotification($uid, $course_id);
+      exit;
       $this->recordEnrollment($uid, $course_id);
       $this->messenger()->addMessage($this->t('Enrollment successful.'));
     } else {
       $this->messenger()->addMessage($this->t('You are already enrolled for this course.'), 'warning');
     }
-
-    // Redirect the user back to the dashboard.
-    //$form_state->setRedirect('custom_student_module.dashboard');
   }
 
   /**
@@ -107,7 +121,7 @@ class StudentEnrollmentForm extends FormBase {
       ->fields([
         'user_id' => $uid,
         'course_id' => $course_id,
-        'created' => date('Y/M/d H:i:s',\Drupal::time()->getRequestTime())
+        'created' => date('Y/M/d H:i:s', \Drupal::time()->getRequestTime())
       ])
       ->execute();
   }

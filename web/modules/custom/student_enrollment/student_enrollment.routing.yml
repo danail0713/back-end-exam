@@ -57,10 +57,10 @@ sorted-users-by-enrolled-courses:
   requirements:
     _permission: 'access content'
 
-/configure-emails-notification:
-  path: '/configure-emails-notification'
+student_enrollment.config_emails:
+  path: '/config-emails'
   defaults:
-    _title: 'Configure notification emails'
-    _form: 'Drupal\student_enrollment\Form\NotificationConfigurationForm'
+    _title: 'Email Notifications'
+    _form: 'Drupal\student_enrollment\Form\NotificationConfigForm'
   requirements:
-    _permission: 'access content'
+    _permission: 'access config form'

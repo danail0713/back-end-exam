@@ -1,3 +1,4 @@
 services:
-  student_enrollment.notify_enrollment:
-    class: Drupal\student_enrollment\Service\EnrollmentNotificationService
+  student_enrollment.notify:
+    class: Drupal\student_enrollment\Services\NotificationService
+    arguments: ['@config.factory','@plugin.manager.mail']

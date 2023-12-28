@@ -29,7 +29,7 @@ function student_enrollment_schema() {
       'created' => [
         'type' => 'datetime',
         'not null' => true,
-        'description' => 'Timestamp of when the enrollment was created.',
+        'description' => 'The time when the enrollment was created.',
       ],
     ],
     'primary key' => ['id'],
@@ -55,6 +55,8 @@ function student_enrollment_form_user_login_form_alter(&$form, FormStateInterfac
       'class' => ['user-reset-password-link'],
     ],
   ];
+  $form['name']['#description'] = new TranslatableMarkup('Username is a combination of first and last name of the user.
+  For example "IvanIvanov".');
 }
 
 
@@ -81,3 +83,11 @@ function student_enrollment_theme() {
     ],
   ];
 }
+
+/**
+ * Implements hook_mail().
+ */
+function student_enrollment_mail() {
+
+}
+
