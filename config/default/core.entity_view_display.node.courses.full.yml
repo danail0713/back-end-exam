@@ -1,0 +1,90 @@
+uuid: fd8575bb-033d-40c9-a27f-6c0046835816
+langcode: en
+status: false
+dependencies:
+  config:
+    - core.entity_view_mode.node.full
+    - field.field.node.courses.field_course_name
+    - field.field.node.courses.field_department
+    - field.field.node.courses.field_description
+    - field.field.node.courses.field_end_date
+    - field.field.node.courses.field_instructor
+    - field.field.node.courses.field_level
+    - field.field.node.courses.field_resourses
+    - field.field.node.courses.field_start_date
+    - field.field.node.courses.field_subject
+    - node.type.courses
+  module:
+    - datetime
+    - layout_builder
+    - user
+third_party_settings:
+  layout_builder:
+    enabled: false
+    allow_custom: false
+id: node.courses.full
+targetEntityType: node
+bundle: courses
+mode: full
+content:
+  field_department:
+    type: entity_reference_label
+    label: above
+    settings:
+      link: true
+    third_party_settings: {  }
+    weight: 5
+    region: content
+  field_description:
+    type: basic_string
+    label: above
+    settings: {  }
+    third_party_settings: {  }
+    weight: 0
+    region: content
+  field_end_date:
+    type: datetime_default
+    label: above
+    settings:
+      timezone_override: ''
+      format_type: olivero_medium
+    third_party_settings: {  }
+    weight: 2
+    region: content
+  field_instructor:
+    type: entity_reference_label
+    label: above
+    settings:
+      link: true
+    third_party_settings: {  }
+    weight: 6
+    region: content
+  field_level:
+    type: entity_reference_label
+    label: above
+    settings:
+      link: true
+    third_party_settings: {  }
+    weight: 4
+    region: content
+  field_start_date:
+    type: datetime_default
+    label: above
+    settings:
+      timezone_override: ''
+      format_type: olivero_medium
+    third_party_settings: {  }
+    weight: 1
+    region: content
+  field_subject:
+    type: entity_reference_label
+    label: above
+    settings:
+      link: true
+    third_party_settings: {  }
+    weight: 3
+    region: content
+hidden:
+  field_course_name: true
+  field_resourses: true
+  links: true

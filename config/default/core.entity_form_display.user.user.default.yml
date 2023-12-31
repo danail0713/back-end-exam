@@ -7,7 +7,6 @@ dependencies:
     - image.style.thumbnail
   module:
     - image
-    - profile
     - user
 _core:
   default_config_hash: FaQ9Ptcpxpg30AtiqRDtl_8zbJArHP1LPfug_s59TOA
@@ -16,12 +15,10 @@ targetEntityType: user
 bundle: user
 mode: default
 content:
-  student_profiles:
-    type: profile_form
+  account:
     weight: 0
     region: content
-    settings:
-      form_mode: default
+    settings: {  }
     third_party_settings: {  }
   user_picture:
     type: image_image
@@ -32,7 +29,7 @@ content:
       preview_image_style: thumbnail
     third_party_settings: {  }
 hidden:
-  account: true
   contact: true
   language: true
+  student_profiles: true
   timezone: true

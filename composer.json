@@ -26,8 +26,10 @@
         "drupal/devel": "^5.0",
         "drupal/easy_breadcrumb": "^2.0",
         "drupal/field_validation": "^1.1",
+        "drupal/mailgun": "^2.0",
         "drupal/menu_per_role": "^1.5",
         "drupal/paragraphs": "^1.16",
+        "drupal/phpmailer_smtp": "^2.2",
         "drupal/profile": "^1.7",
         "drupal/smtp": "^1.2",
         "drupal/symfony_mailer": "^1.4",
@@ -47,7 +49,8 @@
             "drupal/core-composer-scaffold": true,
             "drupal/core-project-message": true,
             "phpstan/extension-installer": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "php-http/discovery": true
         },
         "sort-packages": true
     },

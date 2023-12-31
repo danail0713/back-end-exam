@@ -15,7 +15,12 @@ class MostRecentCoursesController extends ControllerBase {
     ];
     return $build;
   }
-
+  
+  /**
+   * Function to fetch the most enrolled courses in the database. It returns
+   * an associative array with keys the course ids and values the number of times
+   * each course is enrolled.
+   */
   private function fetchCourses() {
     $course_ids = \Drupal::entityQuery('node')
       ->condition('type', 'courses')

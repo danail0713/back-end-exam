@@ -59,8 +59,6 @@ AddEncoding gzip svgz
 # Various rewrite rules.
 <IfModule mod_rewrite.c>
   RewriteEngine on
-  RewriteCond %{HTTPS} off [OR]
-  RewriteRule ^(.*)$ https://127.0.0.1:8888/$1 [L,R=301]
 
   # Set "protossl" to "s" if we were accessed via https://.  This is used later
   # if you enable "www." stripping or enforcement, in order to ensure that
@@ -186,5 +184,3 @@ AddEncoding gzip svgz
   # Disable Proxy header, since it's an attack vector.
   RequestHeader unset Proxy
 </IfModule>
-
-

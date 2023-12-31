@@ -8,6 +8,5 @@ view all student enrollments:
   restrict access: true
 access config form:
   title: 'Access the email config form'
-  description: 'Allows access to a configuration form so the administrator
-can configure the list of emails that are going to be notified.'
+  description: 'Allows access to a configuration form so the administrator can configure the list of emails that are going to be notified.'
   restrict access: true

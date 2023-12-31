@@ -1,0 +1,7 @@
+_core:
+  default_config_hash: vV8ffPnq5PHeVIEQou2n73w7nxehGcp-x5PugRTApXo
+file_syncer: php
+executables:
+  composer: null
+  rsync: null
+additional_trusted_composer_plugins: {  }

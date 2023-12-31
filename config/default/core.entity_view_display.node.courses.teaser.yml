@@ -10,6 +10,7 @@ dependencies:
     - field.field.node.courses.field_end_date
     - field.field.node.courses.field_instructor
     - field.field.node.courses.field_level
+    - field.field.node.courses.field_resourses
     - field.field.node.courses.field_start_date
     - field.field.node.courses.field_subject
     - node.type.courses
@@ -32,5 +33,6 @@ hidden:
   field_end_date: true
   field_instructor: true
   field_level: true
+  field_resourses: true
   field_start_date: true
   field_subject: true

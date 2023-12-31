@@ -1,0 +1,25 @@
+uuid: 2713baea-c5a4-4ce9-b379-34b960b9990c
+langcode: en
+status: true
+dependencies:
+  module:
+    - home_page_title_block
+    - system
+  theme:
+    - olivero
+id: olivero_example
+theme: olivero
+region: content_above
+weight: 0
+provider: null
+plugin: home_page_title_block_example
+settings:
+  id: home_page_title_block_example
+  label: 'Home page title'
+  label_display: '0'
+  provider: home_page_title_block
+visibility:
+  request_path:
+    id: request_path
+    negate: false
+    pages: '<front>'

@@ -4,33 +4,25 @@ status: true
 dependencies:
   config:
     - core.entity_view_mode.node.teaser
-    - field.field.node.instructor.body
+    - field.field.node.instructor.field_bio
     - field.field.node.instructor.field_email
     - field.field.node.instructor.field_mob
     - field.field.node.instructor.field_name
     - node.type.instructor
   module:
-    - text
     - user
 id: node.instructor.teaser
 targetEntityType: node
 bundle: instructor
 mode: teaser
 content:
-  body:
-    type: text_summary_or_trimmed
-    label: hidden
-    settings:
-      trim_length: 600
-    third_party_settings: {  }
-    weight: 101
-    region: content
   links:
     settings: {  }
     third_party_settings: {  }
     weight: 100
     region: content
 hidden:
+  field_bio: true
   field_email: true
   field_mob: true
   field_name: true

@@ -33,6 +33,12 @@ class SortedUsersByEnrolledCoursesController extends ControllerBase {
     return $build;
   }
 
+  /**
+   * Function to fetch all users that enrolled for courses sorted by the number
+   * of courses they enrolled. It returns an associative array with keys user ids
+   * and values the count of courses each user has enrolled.
+   *
+   */
   private function fetchEnrolledUsers() {
     $query = \Drupal::database()
       ->select('student_enrollments', 'se')
@@ -44,6 +50,9 @@ class SortedUsersByEnrolledCoursesController extends ControllerBase {
     return $most_enrolled_courses;
   }
 
+  /**
+   * Function to fetch all users with role "student". It returns an array with user ids.
+   */
   private function fetchAllUsers() {
     $users = \Drupal::entityQuery('user')
       ->condition('roles', 'student')

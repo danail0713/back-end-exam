@@ -3,33 +3,42 @@
 namespace Drupal\student_enrollment\Services;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Mail\MailManagerInterface;
+use Drupal\node\Entity\Node;
+use Mailgun\Mailgun;
 
 /**
- * Service description.
+ * Service that sends emails to configured recipients when a student successfully enroll for a course.
  */
 class NotificationService {
 
-  protected $mailManager;
   protected $configFactory;
 
-  public function __construct(ConfigFactoryInterface $configFactory, MailManagerInterface $mailManager) {
+  public function __construct(ConfigFactoryInterface $configFactory) {
     $this->configFactory = $configFactory;
-    $this->mailManager = $mailManager;
   }
 
-  public function sendEnrollmentNotification($userId, $courseId) {
+  /**
+   * A function to send email notififications to a list of recipients via Mailgun
+   * external service. The service has limitations related to recipients - they must be
+   * authorised to get emails from the domain of the service. Only two emails that are authorised
+   * will receive notifications - danails1307@abv.bg and danail1307@gmail.com. These emails come from
+   * my configuration form.
+   */
+  public function sendEnrollmentNotification($user_id, $course_id) {
+    $mg = Mailgun::create('3836e848c97f50c534b07d0753e413cc-1900dca6-b49d0388');
     $config = $this->configFactory->getEditable('student_enrollment.settings');
     $recipients = $config->get('email_recipients');
-    $params = [
-      'subject' => 'Course Enrollment Notification',
-      'body' => [
-        'message' => "User with id $userId successfully enrolled for the course with id $courseId."
-      ]
-    ];
     $emails = explode(',', $recipients);
+    $user_name = \Drupal::currentUser()->getAccountName();
+    $course_name = Node::load($course_id)->label();
+    $domain = 'sandboxda513894a1fb4bcbaa8abaa2cd936acb.mailgun.org';
     foreach ($emails as $email) {
-      $this->mailManager->mail('student_enrollment', 'notify', trim($email), 'en-US', $params);
+      $mg->messages()->send($domain, [
+        'from'    => "danail1307@gmail.com",
+        'to'      => trim($email),
+        'subject' => "Enrollment notification",
+        'text'    => "User with id $user_id $user_name successfully enrolled for the course with id $course_id $course_name."
+      ]);
     }
   }
 }

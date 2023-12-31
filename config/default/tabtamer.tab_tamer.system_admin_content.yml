@@ -1,0 +1,47 @@
+uuid: c412fb4e-b901-4701-a840-a2ac53399efa
+langcode: en
+status: true
+dependencies: {  }
+id: system_admin_content
+label: system.admin_content
+tabs:
+  2:
+    label: system.admin_content
+    link: Content
+    weight: -10
+    access: true
+  3:
+    label: 'views_view:view.courses.courses'
+    link: Courses
+    weight: -9
+    access: true
+  5:
+    label: 'views_view:view.instructors.instructors'
+    link: Instructors
+    weight: -8
+    access: true
+  7:
+    label: add_resourse.resourse
+    link: Resourses
+    weight: -7
+    access: true
+  6:
+    label: student_enrollment.enrollments
+    link: 'Student enrollments'
+    weight: -6
+    access: true
+  0:
+    label: entity.block_content.collection
+    link: Blocks
+    weight: -5
+    access: true
+  1:
+    label: comment.admin
+    link: Comments
+    weight: -4
+    access: true
+  4:
+    label: 'views_view:view.files.page_1'
+    link: Files
+    weight: -3
+    access: true

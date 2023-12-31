@@ -27,7 +27,7 @@ class ResoursesBlock extends BlockBase {
     // Check if the current page is a node and of type 'courses' and whether the user is enrolled for that course to see its resourses.'
     if ($course instanceof NodeInterface && $course->getType() == 'courses' && $this->isUserEnrolled($course)) {
       $related_resources = $this->getRelatedResources($course);
-      // Build the block content.
+      // Render the resourses.
       $content = [
         '#theme' => 'related-resourses',
         '#resourses' => $related_resources,
@@ -41,6 +41,7 @@ class ResoursesBlock extends BlockBase {
     return $content;
   }
 
+  // check if the user is enrolled for the course
   private function isUserEnrolled(NodeInterface $course) {
     $user = \Drupal::currentUser();
     $query = \Drupal::database()->select('student_enrollments', 'se');
@@ -48,49 +49,42 @@ class ResoursesBlock extends BlockBase {
       ->condition('user_id', $user->id())
       ->condition('course_id', $course->id());
     $enrolled = $query->execute()->fetchAssoc();
-
     return !empty($enrolled);
   }
 
 
   /**
-   * Get related resources for the course.
+   * Get related resourses for the course.
    *
    * @param \Drupal\node\NodeInterface $course
    *   The course node.
    *
    * @return array
-   *   An array of related resource titles and links.
+   *   An array of related resourse details
    */
   private function getRelatedResources(NodeInterface $course) {
-    $relatedResourses = [];
-    // Get referenced resources from the course node.
+    $related_resourses = [];
+    // Get referenced resourses from the course.
     $resourceReferences = $course->get('field_resourses');
     foreach ($resourceReferences as $resourseReference) {
       $resourse = Node::load($resourseReference->target_id);
-      $resourceTitle = $resourse->get('field_title')->value;
-      $resourceDescription = $resourse->get('field_info')->value;
+      $resource_title = $resourse->get('field_title')->value;
+      $resource_description = $resourse->get('field_info')->value;
 
-      // Get the file attached to the resource, if any.
+      // Get the file attached to the resourse.
       $fileField = $resourse->get('field_file_upload');
-      $fileUrl = '';
-      $fileName = '';
-      if ($fileField) {
-        $fileId = $fileField->target_id;
-        $file = File::load($fileId);
-        if ($file) {
-          $fileName = $file->getFilename();
-          $fileUrl = $file->createFileUrl();
-        }
-      }
+      $fileId = $fileField->target_id;
+      $file = File::load($fileId);
+      $file_name = $file->getFilename();
+      $file_url = $file->createFileUrl();
 
       // Add resource details to the array.
-      $relatedResourses[] = [
-        'title' => $resourceTitle,
-        'description' => $resourceDescription,
-        'file' => ['name' => $fileName, 'url' => $fileUrl]
+      $related_resourses[] = [
+        'title' => $resource_title,
+        'description' => $resource_description,
+        'file' => ['name' => $file_name, 'url' => $file_url]
       ];
     }
-    return $relatedResourses;
+    return $related_resourses;
   }
 }

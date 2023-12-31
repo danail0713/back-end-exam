@@ -3,34 +3,31 @@ langcode: en
 status: true
 dependencies:
   config:
-    - field.field.node.instructor.body
+    - field.field.node.instructor.field_bio
     - field.field.node.instructor.field_email
     - field.field.node.instructor.field_mob
     - field.field.node.instructor.field_name
     - node.type.instructor
   module:
     - path
-    - text
 id: node.instructor.default
 targetEntityType: node
 bundle: instructor
 mode: default
 content:
-  body:
-    type: text_textarea_with_summary
-    weight: 2
-    region: content
-    settings:
-      rows: 9
-      summary_rows: 3
-      placeholder: ''
-      show_summary: false
-    third_party_settings: {  }
   created:
     type: datetime_timestamp
     weight: 6
     region: content
     settings: {  }
+    third_party_settings: {  }
+  field_bio:
+    type: string_textarea
+    weight: 26
+    region: content
+    settings:
+      rows: 5
+      placeholder: ''
     third_party_settings: {  }
   field_email:
     type: email_default

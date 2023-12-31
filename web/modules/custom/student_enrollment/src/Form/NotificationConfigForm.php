@@ -19,6 +19,9 @@ class NotificationConfigForm extends FormBase {
     return 'student_enrollment_notification_config';
   }
 
+  /**
+   * {@inheritdoc}
+   */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $form['email_recipients'] = [
       '#type' => 'textarea',
@@ -34,16 +37,17 @@ class NotificationConfigForm extends FormBase {
   }
 
   public static function create(ContainerInterface $container) {
-    // Instantiates this form class.
     return new static(
       $container->get('config.factory')
     );
   }
 
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    // save the email recipients to the configurations.
     $this->getConfig()->set('email_recipients', $form_state->getValue('email_recipients'))->save();
   }
 
+  // Function to fetch an editable configuration of the module.
   private function getConfig() {
     return $this->configFactory->getEditable('student_enrollment.settings');
   }

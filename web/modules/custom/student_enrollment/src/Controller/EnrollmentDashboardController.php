@@ -6,7 +6,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\node\Entity\Node;
 
 /**
- * Returns responses for Student Enrollment routes.
+ * Returns a rendered list of all courses that the current user has enrolled.
  */
 class EnrollmentDashboardController extends ControllerBase {
 
@@ -15,8 +15,7 @@ class EnrollmentDashboardController extends ControllerBase {
    */
   public function build() {
     $current_user = \Drupal::currentUser();
-    // Query to fetch enrolled course IDs for the current user.
-    // Replace 'student_enrollments' with your actual table/entity storing enrollment data.
+    // Query to fetch the ids of the enrolled courses for the current user.
     $query = \Drupal::database()
     ->select('student_enrollments','en')
     ->fields('en',['course_id'])
@@ -25,7 +24,8 @@ class EnrollmentDashboardController extends ControllerBase {
 
     // Load enrolled courses based on the IDs.
     $enrolled_courses = Node::loadMultiple($enrolled_course_ids);
-    // Display enrolled courses in the dashboard.
+
+    // Display enrolled courses in the dashboard by passing them to the enrolled-courses-dashboard twig file.
     $build = [
       '#theme' => 'enrolled-courses-dashboard',
       '#courses' => $enrolled_courses

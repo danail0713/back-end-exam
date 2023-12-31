@@ -20,6 +20,9 @@ class RegisterStudentForm extends FormBase {
     return 'student_enrollment_register_student';
   }
 
+   /**
+   * {@inheritdoc}
+   */
   public function buildForm(array $form, FormStateInterface $form_state) {
     $form['first_name'] = [
       '#type' => 'textfield',

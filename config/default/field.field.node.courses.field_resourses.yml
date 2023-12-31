@@ -1,0 +1,29 @@
+uuid: 0c0e7ca0-729b-4be6-a749-01cbc691b035
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_resourses
+    - node.type.courses
+    - node.type.resourse
+id: node.courses.field_resourses
+field_name: field_resourses
+entity_type: node
+bundle: courses
+label: resourses
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  handler: 'default:node'
+  handler_settings:
+    target_bundles:
+      resourse: resourse
+    sort:
+      field: _none
+      direction: ASC
+    auto_create: false
+    auto_create_bundle: ''
+field_type: entity_reference

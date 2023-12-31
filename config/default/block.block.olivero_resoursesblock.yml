@@ -1,0 +1,33 @@
+uuid: 92ba5533-4c29-4f9b-88aa-2eb4251fabdd
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - resourse_block
+    - system
+  theme:
+    - olivero
+id: olivero_resoursesblock
+theme: olivero
+region: content
+weight: 0
+provider: null
+plugin: resourse_block_resourses_block
+settings:
+  id: resourse_block_resourses_block
+  label: Resourses
+  label_display: visible
+  provider: resourse_block
+visibility:
+  request_path:
+    id: request_path
+    negate: false
+    pages: '/node/*'
+  'entity_bundle:node':
+    id: 'entity_bundle:node'
+    negate: false
+    context_mapping:
+      node: '@node.node_route_context:node'
+    bundles:
+      courses: courses

@@ -1,0 +1,5 @@
+_core:
+  default_config_hash: '-6PIs194HODxz9XnmFxQNGOnNaUGE1N3pFgEwJrijso'
+cron: disable
+allow_core_minor_updates: false
+status_check_mail: errors_only
