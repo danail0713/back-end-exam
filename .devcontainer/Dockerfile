@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM drupal:php8.3-fpm-bullseye
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
 COPY php.ini /tmp
