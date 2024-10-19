@@ -70,6 +70,13 @@ class CustomBreadcrumbsSettingsForm extends ConfigFormBase {
       '#min' => 0,
     ];
 
+    $form['site_wide'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Site wide breadcrumbs'),
+      '#description' => $this->t('Right now, custom breadcrumbs works only if you defined a custom breadcrumb entity for paths or content types, this settings allow to add title to other pages like a crumb.'),
+      '#default_value' => $config->get('site_wide'),
+    ];
+
     $form['admin_pages_disable'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Disable on admin pages'),
@@ -90,6 +97,7 @@ class CustomBreadcrumbsSettingsForm extends ConfigFormBase {
       ->set('current_page', $form_state->getValue('current_page'))
       ->set('current_page_link', $form_state->getValue('current_page_link'))
       ->set('trim_title', $form_state->getValue('trim_title'))
+      ->set('site_wide', $form_state->getValue('site_wide'))
       ->set('admin_pages_disable', $form_state->getValue('admin_pages_disable'))
       ->save();
 

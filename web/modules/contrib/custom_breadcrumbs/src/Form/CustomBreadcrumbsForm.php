@@ -160,7 +160,11 @@ class CustomBreadcrumbsForm extends EntityForm {
       '#type' => 'textarea',
       '#title' => $this->t('Path pattern'),
       '#default_value' => $this->entity->get('pathPattern'),
-      '#description' => $this->t('A set of patterns separated by a newline. @front_key@ is used to front page. The \'*\' character is a wildcard. An example path is /admin/* for every admin pages.', ['@front_key@' => '<front>']),
+      '#description' => $this->t("A set of patterns separated by a newline. @front_key@ is used to front page. The * character is a wildcard. An example path is /admin/* for every admin pages.",
+        [
+          '@front_key@' => '<front>',
+        ]
+      ),
       '#states' => [
         'visible' => [
           ':input[name="type"]' => ['value' => '2'],
@@ -173,9 +177,7 @@ class CustomBreadcrumbsForm extends EntityForm {
       '#title' => $this->t('Breadcrumb paths'),
       '#default_value' => $this->entity->get('breadcrumbPaths'),
       '#required' => TRUE,
-      '#description' => $this->t(
-        'One url per line, you can use <a href="@token">Token</a> module. Url must start from "/". ' .
-        'Use @nolink_key if you don\'t want to set a link for the respective title.',
+      '#description' => $this->t('Enter one URL per line. You can utilize the <a href="@token">Token</a> module. URLs must start with "/" and use <code>@nolink_key</code> if you prefer not to set a link for the respective title.',
         [
           '@token' => 'https://www.drupal.org/project/token',
           '@nolink_key' => '<nolink>',

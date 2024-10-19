@@ -20,11 +20,14 @@ INSTALLATION
 CONFIGURATION
 -------------
 
- * Configure the user permissions in Administration » People » Permissions:
+ * Configure the user permissions in
+Administration » People » Permissions:
 
- * Customize the basic breadcrumbs settings in Configuration » User interface » Custom breadcrumbs settings
+ * Customize the basic breadcrumbs settings in
+Configuration » User interface » Custom breadcrumbs settings
 
- * You can add a new breadcrumbs instances in Structure » Custom breadcrumbs
+ * You can add a new breadcrumbs instances in Structure » Custom
+breadcrumbs
 
 USAGE
 -------------
@@ -33,12 +36,14 @@ USAGE
 * you can create breadcrumbs for your entities like nodes or pages using path
 * remember to check "Enabled" status
 * setup urls and titles, one per line
-* you can use an extra vars like <nolink> or <term_hierarchy:field_name> to attach taxonomy tree to breadcrumbs
+* you can use an extra vars like <nolink> or <term_hierarchy:field_name> to
+attach taxonomy tree to breadcrumbs
 * if you want to use query value from token, for example for search results,
-you have to define extra cache contexts ```url.query_args:search``` where search is your query key
-* On every content type manage display page, you can display breadcrumbs like field,
-this solution has been designed for displaying breadcrumbs on node teaser display mode in
-search results.
+you have to define extra cache contexts ```url.query_args:search``` where
+search is your query key
+* On every content type manage display page, you can display breadcrumbs like
+field, this solution has been designed for displaying breadcrumbs on node
+teaser display mode in search results.
 
 
 MAINTAINERS
@@ -51,5 +56,5 @@ This project has been sponsored by:
  * Abventor
 
    A Drupal Development Team Who Deliver.
-   We create flexible solutions that companies and organizations from around the world use.
-
+   We create flexible solutions that companies and organizations from around
+   the world use.

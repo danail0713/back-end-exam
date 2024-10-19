@@ -27,7 +27,9 @@ use Drupal\taxonomy\TermInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * Class BreadcrumbBuilder.
+ * Breadcrumb builder class for generating breadcrumbs.
+ *
+ * Builds breadcrumbs within the context of the abv_app Drupal package.
  *
  * @package Drupal\abv_app
  */
@@ -131,19 +133,10 @@ class BreadcrumbBuilder implements BreadcrumbBuilderInterface {
    *   Path matcher.
    * @param \Drupal\Core\Routing\AdminContext $routerAdminContext
    *   Router admin context.
-   * @param \Drupal\Core\File\FileUrlGeneratorInterface|NULL $fileUrlGenerator
+   * @param \Drupal\Core\File\FileUrlGeneratorInterface|null $fileUrlGenerator
    *   FileUrlGenerator service.
    */
-  public function __construct(ConfigFactoryInterface $configFactory,
-                              EntityTypeManagerInterface $entityTypeManager,
-                              LanguageManagerInterface $languageManager,
-                              RequestStack $requestStack,
-                              TitleResolverInterface $titleResolver,
-                              Token $token,
-                              AliasManagerInterface $aliasManager,
-                              PathMatcherInterface $pathMatcher,
-                              AdminContext $routerAdminContext,
-                              FileUrlGeneratorInterface $fileUrlGenerator = NULL) {
+  public function __construct(ConfigFactoryInterface $configFactory, EntityTypeManagerInterface $entityTypeManager, LanguageManagerInterface $languageManager, RequestStack $requestStack, TitleResolverInterface $titleResolver, Token $token, AliasManagerInterface $aliasManager, PathMatcherInterface $pathMatcher, AdminContext $routerAdminContext, FileUrlGeneratorInterface $fileUrlGenerator) {
     $this->entityTypeManager = $entityTypeManager;
     $this->languageManager = $languageManager;
     $this->token = $token;
@@ -154,10 +147,6 @@ class BreadcrumbBuilder implements BreadcrumbBuilderInterface {
     $this->aliasManager = $aliasManager;
     $this->pathMatcher = $pathMatcher;
     $this->routerAdminContext = $routerAdminContext;
-    if (!$fileUrlGenerator) {
-      @trigger_error('Calling BreadcrumbBuilder::__construct() without the $fileUrlGenerator argument is deprecated in custom_breadcrumbs:1.1.0 and will be required in a future release of custom_breadcrumbs. See https://www.drupal.org/project/custom_breadcrumbs/issues/3392155.', E_USER_DEPRECATED);
-      $fileUrlGenerator = \Drupal::service('file_url_generator');
-    }
     $this->fileUrlGenerator = $fileUrlGenerator;
   }
 
@@ -166,13 +155,13 @@ class BreadcrumbBuilder implements BreadcrumbBuilderInterface {
    */
   public function applies(RouteMatchInterface $route_match) {
     $route = $route_match->getRouteObject();
+    $settings = $this->customBreadcrumbsSettings;
 
-    if ((isset($this->customBreadcrumbsSettings['admin_pages_disable']) && $this->customBreadcrumbsSettings['admin_pages_disable'] == TRUE)
-      && (!empty($route) && $this->routerAdminContext->isAdminRoute($route))) {
+    if ($settings['admin_pages_disable'] && (!empty($route) && $this->routerAdminContext->isAdminRoute($route))) {
       return FALSE;
     }
 
-    if (!$this->matchPaths($route_match) && !$this->matchEntity($route_match)) {
+    if (!$this->matchPaths($route_match) && !$this->matchEntity($route_match) && !$settings['site_wide']) {
       return FALSE;
     }
 

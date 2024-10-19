@@ -72,3 +72,6 @@ phpmailer_smtp.format:
     format:
       type: string
       label: 'Email format'
+    force_html:
+      type: boolean
+      label: 'Send all email as HTML'

@@ -5,6 +5,7 @@ declare(strict_types = 1);
 namespace Drupal\Tests\menu_per_role\Functional;
 
 use Drupal\Core\Session\AccountInterface;
+use Drupal\user\UserInterface;
 
 /**
  * Test access control to menu links.
@@ -162,31 +163,51 @@ class MenuPerRoleAccessTest extends MenuPerRoleFunctionalTestBase {
 
     // User1.
     $user1Role = $this->drupalCreateRole($this->user1Permissions, $this->user1Role);
-    $this->user1 = $this->drupalCreateUser([], 'user1');
+    $user1 = $this->drupalCreateUser([], 'user1');
+    if (!($user1 instanceof UserInterface)) {
+      $this->fail('Impossible to create the tests user.');
+    }
+    $this->user1 = $user1;
     $this->user1->addRole($user1Role);
     $this->user1->save();
 
     // User2.
     $user2Role = $this->drupalCreateRole($this->user2Permissions, $this->user2Role);
-    $this->user2 = $this->drupalCreateUser([], 'user2');
+    $user2 = $this->drupalCreateUser([], 'user2');
+    if (!($user2 instanceof UserInterface)) {
+      $this->fail('Impossible to create the tests user.');
+    }
+    $this->user2 = $user2;
     $this->user2->addRole($user2Role);
     $this->user2->save();
 
     // User3.
     $user3Role = $this->drupalCreateRole($this->user3Permissions, $this->user3Role);
-    $this->user3 = $this->drupalCreateUser([], 'user3');
+    $user3 = $this->drupalCreateUser([], 'user3');
+    if (!($user3 instanceof UserInterface)) {
+      $this->fail('Impossible to create the tests user.');
+    }
+    $this->user3 = $user3;
     $this->user3->addRole($user3Role);
     $this->user3->save();
 
     // User4.
     $user4Role = $this->drupalCreateRole($this->user4Permissions, $this->user4Role);
-    $this->user4 = $this->drupalCreateUser([], 'user4');
+    $user4 = $this->drupalCreateUser([], 'user4');
+    if (!($user4 instanceof UserInterface)) {
+      $this->fail('Impossible to create the tests user.');
+    }
+    $this->user4 = $user4;
     $this->user4->addRole($user4Role);
     $this->user4->save();
 
     // Admin.
     $adminRole = $this->drupalCreateRole($this->adminPermissions, $this->adminRole);
-    $this->admin = $this->drupalCreateUser([], 'admin_menu_per_role', TRUE);
+    $admin = $this->drupalCreateUser([], 'admin_menu_per_role', TRUE);
+    if (!($admin instanceof UserInterface)) {
+      $this->fail('Impossible to create the tests user.');
+    }
+    $this->admin = $admin;
     $this->admin->addRole($adminRole);
     $this->admin->save();
   }

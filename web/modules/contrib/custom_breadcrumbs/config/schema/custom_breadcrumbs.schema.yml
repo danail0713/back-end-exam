@@ -51,3 +51,6 @@ custom_breadcrumbs.settings:
     admin_pages_disable:
       label: 'Disable on admin pages'
       type: boolean
+    site_wide:
+      label: 'Site wide breadcrumbs'
+      type: boolean

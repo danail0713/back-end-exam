@@ -148,6 +148,7 @@ class CustomBreadcrumbsTest extends BrowserTestBase {
       ->set('current_page_link', FALSE)
       ->set('trim_title', 0)
       ->set('admin_pages_disable', FALSE)
+      ->set('site_wide', FALSE)
       ->save();
 
     $label = 'Test article';

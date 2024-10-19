@@ -4,3 +4,4 @@ current_page: TRUE
 current_page_link: FALSE
 trim_title: 0
 admin_pages_disable: FALSE
+site_wide: FALSE

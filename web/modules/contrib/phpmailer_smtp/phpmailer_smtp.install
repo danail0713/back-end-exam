@@ -72,3 +72,12 @@ function phpmailer_smtp_update_8003() {
     ->set('format', 'plain_text')
     ->save(TRUE);
 }
+
+/**
+ * Add Send all email as HTML setting.
+ */
+function phpmailer_smtp_update_8004() {
+  \Drupal::configFactory()->getEditable('phpmailer_smtp.format')
+    ->set('force_html', 0)
+    ->save(TRUE);
+}

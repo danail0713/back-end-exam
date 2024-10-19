@@ -42,6 +42,18 @@ class FormatForm extends ConfigFormBase {
       '#description' => $this->t('Setting the format to HTML will cause the "Content-Type" header to be respected.'),
     ];
 
+    $form['force_html'] = [
+      '#type' => 'checkbox',
+      '#title' => $this->t('Send all email as HTML'),
+      '#default_value' => $config->get('force_html'),
+      '#description' => $this->t('Send all email as HTML ignoring the "Content-Type" header.'),
+      '#states' => [
+        'visible' => [
+          ':input[name="format"]' => ['value' => 'html'],
+        ],
+      ],
+    ];
+
     return parent::buildForm($form, $form_state);
   }
 
@@ -53,8 +65,9 @@ class FormatForm extends ConfigFormBase {
 
     // Save the configuration changes.
     $phpmailer_smtp_config = $this->config('phpmailer_smtp.format');
-    $phpmailer_smtp_config->set('format', $values['format']);
-    $phpmailer_smtp_config->save();
+    $phpmailer_smtp_config->set('format', $values['format'])
+      ->set('force_html', $values['force_html'])
+      ->save();
 
     parent::submitForm($form, $form_state);
   }
