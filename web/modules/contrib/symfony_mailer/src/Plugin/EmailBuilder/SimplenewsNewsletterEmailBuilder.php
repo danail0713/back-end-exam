@@ -20,7 +20,6 @@ use Drupal\symfony_mailer\Entity\MailerPolicy;
  *   },
  *   has_entity = TRUE,
  *   override = {"simplenews.node", "simplenews.test", "simplenews.extra"},
- *   override_warning = @Translation("Not tested for large numbers of recipients"),
  *   common_adjusters = {"email_subject", "email_from"},
  *   import = @Translation("Simplenews newsletter settings"),
  *   form_alter = {

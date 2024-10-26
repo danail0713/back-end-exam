@@ -6,6 +6,7 @@ use Drupal\KernelTests\KernelTestBase;
 use Drupal\symfony_mailer\Address;
 use Drupal\symfony_mailer_test\MailerTestTrait;
 use Drupal\Tests\RandomGeneratorTrait;
+use Drupal\TestTools\Random;
 
 /**
  * Tests basic email sending.
@@ -86,12 +87,12 @@ class SymfonyMailerKernelTest extends KernelTestBase {
   /**
    * Data provider for ::testEmailAddresses().
    */
-  public function testEmailAddressesProvider(): array {
+  public static function emailAddressesProvider(): array {
     $addresses = [
       '<site>',
-      $this->randomMachineName() . '@example.com',
-      new Address($this->randomMachineName() . '@example.com'),
-      new Address($this->randomMachineName() . '@example.com', $this->randomMachineName()),
+      Random::machineName() . '@example.com',
+      new Address(Random::machineName() . '@example.com'),
+      new Address(Random::machineName() . '@example.com', Random::machineName()),
     ];
 
     // Generate a different sets of headers/values.
@@ -129,7 +130,7 @@ class SymfonyMailerKernelTest extends KernelTestBase {
    * @param mixed $addresses
    *   The email addresses.
    *
-   * @dataProvider testEmailAddressesProvider
+   * @dataProvider emailAddressesProvider
    */
   public function testEmailAddresses(string $name, $addresses) {
     $email = $this->emailFactory->newTypedEmail('symfony_mailer', 'test', $this->addressTo);

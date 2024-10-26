@@ -36,7 +36,7 @@
         "drupal/tab_manager": "^1.0",
         "drupal/tabtamer": "^2.0@beta",
         "drupal/webform": "^6.2",
-        "drush/drush": "^12.5"
+        "drush/drush": "^13.3"
     },
     "conflict": {
         "drupal/drupal": "*"

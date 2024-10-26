@@ -28,7 +28,8 @@ class EnrollmentDashboardController extends ControllerBase {
     // Display enrolled courses in the dashboard by passing them to the enrolled-courses-dashboard twig file.
     $build = [
       '#theme' => 'enrolled-courses-dashboard',
-      '#courses' => $enrolled_courses
+      '#courses' => $enrolled_courses,
+      '#cache' => ['max-age' => 0]
     ];
     return $build;
   }

@@ -526,7 +526,7 @@ class Email implements InternalEmailInterface {
         '#template' => $this->subject,
         '#context' => $this->variables,
       ];
-      $this->subject = $this->renderer->renderPlain($subject);
+      $this->subject = $this->renderer->renderInIsolation($subject);
     }
 
     if ($this->subject instanceof MarkupInterface) {
@@ -535,7 +535,7 @@ class Email implements InternalEmailInterface {
 
     // Render body.
     $body = ['#theme' => 'email', '#email' => $this];
-    $html = $this->renderer->renderPlain($body);
+    $html = $this->renderer->renderInIsolation($body);
     $this->phase = self::PHASE_POST_RENDER;
     $this->setHtmlBody($html);
     $this->body = [];
