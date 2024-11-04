@@ -84,11 +84,11 @@ class CoursesAPIController extends ControllerBase {
       $file_id = $resourse->get('field_file_upload')->target_id;
       $file = File::load($file_id);
       $file_url = $file->createFileUrl();
-      $domain = "http://127.0.0.1:8888/";
+      $domain = \Drupal::request()->getHost();
       $resourses[] = [
         'title' => $resourse->get('field_title')->value,
         'description' => $resourse->get('field_info')->value,
-        'url' => "$domain $file_url",
+        'url' => $domain.$file_url,
       ];
     }
     return $resourses;

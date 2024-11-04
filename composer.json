@@ -15,6 +15,7 @@
         }
     ],
     "require": {
+        "chi-teck/drupal-code-generator": "^3.6",
         "composer/installers": "^2.0",
         "drupal/automatic_updates": "^2",
         "drupal/bootstrap": "^3.29",
@@ -36,7 +37,7 @@
         "drupal/tab_manager": "^1.0",
         "drupal/tabtamer": "^2.0@beta",
         "drupal/webform": "^6.2",
-        "drush/drush": "^12.5"
+        "drush/drush": "^13.3"
     },
     "conflict": {
         "drupal/drupal": "*"

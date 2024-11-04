@@ -28,6 +28,7 @@ class SortedUsersByEnrolledCoursesController extends ControllerBase {
 
     $build = [
       '#theme' => 'sorted-users-by-enrolled-courses',
+      '#cache' => ['max-age' => 0],
       '#users' => $users_for_render
     ];
     return $build;

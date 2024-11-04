@@ -11,6 +11,7 @@ class MostRecentCoursesController extends ControllerBase {
     $courses = $this->fetchCourses();
     $build = [
       '#theme' => 'most-recent-courses',
+      '#cache' => ['max-age' => 0],
       '#courses' => $courses
     ];
     return $build;

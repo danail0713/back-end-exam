@@ -1,0 +1,5 @@
+name: 'front_page_modifier'
+type: module
+description: 'Removes the welcome message to the user.'
+package: Custom
+core_version_requirement: ^10 || ^11

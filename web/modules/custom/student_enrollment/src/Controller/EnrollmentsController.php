@@ -37,6 +37,7 @@ class EnrollmentsController extends ControllerBase {
     }
     $build = [
       '#theme' => 'enrollmentsTable',
+      '#cache' => ['max-age' => 0],
       '#enrollments' => $enrollments_for_render
     ];
     return $build;

@@ -27,6 +27,7 @@ class MostEnrolledCoursesController extends ControllerBase {
 
     $build = [
       '#theme' => 'most-enrolled-courses',
+      '#cache' => ['max-age' => 0],
       '#courses' => $courses_for_render,
     ];
     return $build;
