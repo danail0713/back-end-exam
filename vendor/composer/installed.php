@@ -794,9 +794,9 @@
             'dev_requirement' => false,
         ),
         'league/container' => array(
-            'pretty_version' => '4.2.2',
-            'version' => '4.2.2.0',
-            'reference' => 'ff346319ca1ff0e78277dc2311a42107cc1aab88',
+            'pretty_version' => '4.2.3',
+            'version' => '4.2.3.0',
+            'reference' => '72f9bebe7bd623007782a40f5ec305661ab706d8',
             'type' => 'library',
             'install_path' => __DIR__ . '/../league/container',
             'aliases' => array(),

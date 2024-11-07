@@ -35,7 +35,7 @@ class ResoursesBlock extends BlockBase {
     } else {
       $content = [
         '#type' => 'markup',
-        '#markup' => $this->t("Resourses for this course are not available, because you aren't enrolled for it.")
+        '#markup' => $this->t("Resourses for this course are not available, because you aren't enrolled for it."),
       ];
     }
     $content['#cache']['max-age'] = 0;
