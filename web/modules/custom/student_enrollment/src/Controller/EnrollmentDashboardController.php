@@ -30,8 +30,6 @@ class EnrollmentDashboardController extends ControllerBase {
       '#theme' => 'enrolled-courses-dashboard',
       '#courses' => $enrolled_courses,
       '#cache' => ['max-age' => 0]
-      '#cache' => ['max-age' => 0],
-      '#courses' => $enrolled_courses
     ];
     return $build;
   }
