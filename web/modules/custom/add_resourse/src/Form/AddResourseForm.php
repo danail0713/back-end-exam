@@ -36,7 +36,12 @@ class AddResourseForm extends FormBase {
     // Add File Upload field.
     $form['file_upload'] = [
       '#type' => 'managed_file',
-      '#title' => $this->t('File Upload'),
+      '#title' => $this->t('Upload file'),
+      '#upload_validators' => [
+        'FileExtension' => [
+           'extensions' => 'pdf doc docx avi mp3 mp4 mov',
+          ],
+        ],
       '#required' => TRUE,
       '#description' => $this->t('Upload a file for the resource.'),
     ];

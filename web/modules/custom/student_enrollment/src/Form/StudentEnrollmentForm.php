@@ -74,17 +74,21 @@ class StudentEnrollmentForm extends FormBase {
     $user_id = \Drupal::currentUser()->id();
     $course_id = $form_state->getValue('course_id');
     $course_start_date = new DateTime(Node::load($course_id)->get('field_start_date')->value);
+    $course_end_date = new DateTime(Node::load($course_id)->get('field_end_date')->value);
     $now_date = new DateTime();
-   
+
     // Check if the user is already enrolled in the selected course.
     if (!$this->isUserEnrolled($user_id, $course_id)) {
-      if ($now_date < $course_start_date) {
+      if ($now_date < $course_start_date ) {
         // Record the enrollment.
         $this->recordEnrollment($user_id, $course_id);
         $this->messenger()->addMessage($this->t('Enrollment successful.'));
         $this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
-      } else {
+      } else if ($now_date >= $course_start_date && $now_date <= $course_end_date) {
         $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');
+      }
+      else {
+        $this->messenger()->addMessage($this->t("This course has already ended. You can't enroll for it."), 'warning');
       }
     } else {
       $this->messenger()->addMessage($this->t('You are already enrolled for this course.'), 'warning');

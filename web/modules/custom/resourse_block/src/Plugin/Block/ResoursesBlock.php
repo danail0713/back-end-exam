@@ -69,6 +69,9 @@ class ResoursesBlock extends BlockBase {
     $resourceReferences = $course->get('field_resourses');
     foreach ($resourceReferences as $resourseReference) {
       $resourse = Node::load($resourseReference->target_id);
+      if (!$resourse) {
+        continue; // Skip if the referenced node doesn't exist.
+      }
       $resource_title = $resourse->get('field_title')->value;
       $resource_description = $resourse->get('field_info')->value;
 
