@@ -1,0 +1,7 @@
+block.settings.themes_block:
+  type: block_settings
+  label: 'Themes block'
+  mapping:
+    example:
+      type: string
+      label: Example

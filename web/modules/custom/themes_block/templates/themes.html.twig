@@ -1,0 +1,21 @@
+<div class="themes">
+  <h3>Themes</h3>
+	{% for theme in themes %}
+		<div class="theme">
+			<h5>{{ theme.title }}</h5>
+			<p>{{ theme.description }}</p>
+      <h6>Resourses</h6>
+			{% if theme.resources %}
+				<ul>
+					{% for resource in theme.resources %}
+						<li>
+							<a href="{{ resource.url }}">{{ resource.title }}</a>
+						</li>
+					{% endfor %}
+				</ul>
+			{% else %}
+				<p>No resources available.</p>
+			{% endif %}
+		</div>
+	{% endfor %}
+</div>

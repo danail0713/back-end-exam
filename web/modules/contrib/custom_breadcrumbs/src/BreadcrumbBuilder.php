@@ -442,24 +442,29 @@ class BreadcrumbBuilder implements BreadcrumbBuilderInterface {
       ->execute();
     $breadcrumbSettings = CustomBreadcrumbs::loadMultiple(array_keys($breadcrumbSettingsIDs));
 
-    $url = Url::fromRouteMatch($route_match);
+    try {
+      $url = Url::fromRouteMatch($route_match);
 
-    foreach ($breadcrumbSettings as $breadcrumbSetting) {
-      $langcode = $breadcrumbSetting->get('language') != 'und' ? $breadcrumbSetting->get('language') : NULL;
+      foreach ($breadcrumbSettings as $breadcrumbSetting) {
+        $langcode = $breadcrumbSetting->get('language') != 'und' ? $breadcrumbSetting->get('language') : NULL;
 
-      $aliases = [];
-      $aliases[] = $this->aliasManager->getAliasByPath('/' . $url->getInternalPath(), $langcode);
-      $aliases[] = '/' . $url->getInternalPath();
-      $pattern = $breadcrumbSetting->get('pathPattern');
+        $aliases = [];
+        $aliases[] = $this->aliasManager->getAliasByPath('/' . $url->getInternalPath(), $langcode);
+        $aliases[] = '/' . $url->getInternalPath();
+        $pattern = $breadcrumbSetting->get('pathPattern');
 
-      // Replace any tokens in Path.
-      $pattern = $this->token->replace($pattern);
+        // Replace any tokens in Path.
+        $pattern = $this->token->replace($pattern);
 
-      foreach ($aliases as $alias) {
-        if ($this->pathMatcher->matchPath($alias, $pattern)) {
-          return $breadcrumbSetting;
+        foreach ($aliases as $alias) {
+          if ($this->pathMatcher->matchPath($alias, $pattern)) {
+            return $breadcrumbSetting;
+          }
         }
       }
+    }
+    catch (\InvalidArgumentException $e) {
+      return FALSE;
     }
 
     return FALSE;
