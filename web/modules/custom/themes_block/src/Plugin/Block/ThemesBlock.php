@@ -7,6 +7,7 @@ namespace Drupal\themes_block\Plugin\Block;
 use Drupal\Core\Block\BlockBase;
 use Drupal\node\Entity\Node;
 use Drupal\Core\Url;
+use Drupal\node\NodeInterface;
 use Drupal\paragraphs\Entity\Paragraph;
 
 /**
@@ -39,7 +40,6 @@ final class ThemesBlock extends BlockBase {
               'description' => $paragraph->get('field_description')->value,
               'resources' => [],
             ];
-
             // Process resources.
             $resources = $paragraph->get('field_resources');
             foreach ($resources as $resource_ref) {
@@ -59,18 +59,31 @@ final class ThemesBlock extends BlockBase {
           }
         }
       }
-
-      // Pass data to the Twig template.
+      $isUserEnrolled = $this->isUserEnrolled($current_node);
       return [
         '#theme' => 'themes',
         '#themes' => $themes,
+        '#user_enrolled' => $isUserEnrolled,
         '#cache' => ['max-age' => 0],
+        '#attached' => [
+          'library' => [
+            'themes_block/themes_toggle',
+          ],
+        ],
       ];
     }
-
     // Return a default message if not on the course page.
-    return [
-      '#markup' => $this->t('Themes are not available on this page.'),
-    ];
+    return [];
+  }
+
+  // check if the user is enrolled for the course
+  private function isUserEnrolled(NodeInterface $course) {
+    $user = \Drupal::currentUser();
+    $query = \Drupal::database()->select('student_enrollments', 'se');
+    $query->fields('se', ['user_id', 'course_id'])
+      ->condition('user_id', $user->id())
+      ->condition('course_id', $course->id());
+    $enrolled = $query->execute()->fetchAssoc();
+    return !empty($enrolled);
   }
 }

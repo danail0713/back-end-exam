@@ -13,7 +13,7 @@ declare(strict_types=1);
 function themes_block_theme(): array {
   return [
     'themes' => [
-      'variables' => ['themes' => NULL],
+      'variables' => ['themes' => NULL, 'user_enrolled' => NULL],
     ],
   ];
 }

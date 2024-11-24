@@ -1,21 +1,35 @@
 <div class="themes">
-  <h3>Themes</h3>
-	{% for theme in themes %}
-		<div class="theme">
-			<h5>{{ theme.title }}</h5>
-			<p>{{ theme.description }}</p>
-      <h6>Resourses</h6>
-			{% if theme.resources %}
-				<ul>
-					{% for resource in theme.resources %}
-						<li>
-							<a href="{{ resource.url }}">{{ resource.title }}</a>
-						</li>
-					{% endfor %}
-				</ul>
-			{% else %}
-				<p>No resources available.</p>
-			{% endif %}
-		</div>
-	{% endfor %}
+	<h3>Themes</h3>
+	<ol class="themes-list">
+		{% if themes %}
+			{% for theme in themes %}
+				<li class="theme-item">
+					<div class="theme-header">
+						<span class="theme-number">{{ loop.index }}.</span>
+						<span class="theme-title">{{ theme.title }}</span>
+						<button class="toggle-btn" aria-expanded="false" aria-controls="theme-content-{{ loop.index }}">+</button>
+					</div>
+					<div class="theme-body" id="theme-content-{{ loop.index }}">
+						<p class="theme-description">{{ theme.description }}</p>
+						<strong>Resources</strong>
+						{% if theme.resources and user_enrolled %}
+							<ul class="theme-resources">
+								{% for resource in theme.resources %}
+									<li>
+										<a href="{{ resource.url }}">{{ resource.title }}</a>
+									</li>
+								{% endfor %}
+							</ul>
+						{% elseif not theme.resources %}
+							<p>No resources available.</p>
+            {% else %}
+              <p>You can't access resources because you aren't enrolled for this course.</p>
+						{% endif %}
+					</div>
+				</li>
+			{% endfor %}
+		{% else %}
+			<p>No themes found.</p>
+		{% endif %}
+	</ol>
 </div>
