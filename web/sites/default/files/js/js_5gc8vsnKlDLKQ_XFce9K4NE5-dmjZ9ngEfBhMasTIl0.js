@@ -1,0 +1,2 @@
+/* @license GPL-2.0-or-later https://www.drupal.org/licensing/faq */
+(function($){$(document).ready(function(){$(".toggle-btn").on("click",function(){var $this=$(this);var contentId=$this.attr("aria-controls");var $themeBody=$("#"+contentId);if($themeBody.is(":visible")){$themeBody.slideUp(300);$this.text("+");$this.attr("aria-expanded","false");}else{$themeBody.slideDown(300);$this.text("-");$this.attr("aria-expanded","true");}});});})(jQuery);;
