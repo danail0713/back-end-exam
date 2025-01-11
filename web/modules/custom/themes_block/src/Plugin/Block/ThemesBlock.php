@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Drupal\themes_block\Plugin\Block;
 
 use Drupal\Core\Block\BlockBase;
+use Drupal\Core\Render\Element\Url;
+use Drupal\Core\Url as CoreUrl;
+use Drupal\file\Entity\File;
 use Drupal\node\Entity\Node;
-use Drupal\Core\Url;
 use Drupal\node\NodeInterface;
 use Drupal\paragraphs\Entity\Paragraph;
 
@@ -30,33 +32,26 @@ final class ThemesBlock extends BlockBase {
     if ($current_node instanceof Node && $current_node->getType() === 'courses') {
       $themes_field = $current_node->get('field_themes');
       $themes = [];
-
-      foreach ($themes_field as $theme_ref) {
-        if (isset($theme_ref->target_id)) {
+      if ($themes_field) {
+        foreach ($themes_field as $theme_ref) {
           $paragraph = Paragraph::load($theme_ref->target_id);
-          if ($paragraph) {
-            $theme_data = [
-              'title' => $paragraph->get('field_title')->value,
-              'description' => $paragraph->get('field_description')->value,
-              'resources' => [],
-            ];
-            // Process resources.
-            $resources = $paragraph->get('field_resources');
+          $theme_data = [
+            'title' => $paragraph->get('field_title')->value,
+            'description' => $paragraph->get('field_description')->value,
+            'resources' => [],
+          ];
+          $resources = $paragraph->get('field_resources');
+          if ($resources) {
             foreach ($resources as $resource_ref) {
-              if (isset($resource_ref->target_id)) {
-                $resource = Node::load($resource_ref->target_id);
-                if ($resource) {
-                  $url = Url::fromRoute('entity.node.canonical', ['node' => $resource->id()], ['absolute' => TRUE])->toString();
-                  $theme_data['resources'][] = [
-                    'title' => $resource->label(),
-                    'url' => Url::fromRoute('entity.node.canonical', ['node' => $resource->id()]),
-                  ];
-                }
-              }
+              $fileParagraph = Paragraph::load($resource_ref->target_id);
+              $file_id = $fileParagraph->get('field_file')->target_id;
+              $file = File::load($file_id);
+              $file_name = $file->getFilename();
+              $file_url = $file->createFileUrl();
+              $theme_data['resources'][] = ['fileName' => $file_name, 'fileUrl' => $file_url];
             }
-
-            $themes[] = $theme_data;
           }
+          $themes[] = $theme_data;
         }
       }
       $isUserEnrolled = $this->isUserEnrolled($current_node);

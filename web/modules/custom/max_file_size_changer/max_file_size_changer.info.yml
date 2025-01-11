@@ -1,0 +1,5 @@
+name: 'Max File Size changer'
+type: module
+description: 'This is a module that changes the maximum file upload limit in Drupal.'
+package: Custom
+core_version_requirement: ^10 || ^11

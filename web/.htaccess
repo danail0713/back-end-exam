@@ -184,3 +184,9 @@ AddEncoding gzip svgz
   # Disable Proxy header, since it's an attack vector.
   RequestHeader unset Proxy
 </IfModule>
+
+# PHP settings (increase limits)
+<IfModule mod_php.c>
+  php_value upload_max_filesize 500M
+  php_value post_max_size 500M
+</IfModule>

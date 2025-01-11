@@ -83,7 +83,7 @@ class StudentEnrollmentForm extends FormBase {
         // Record the enrollment.
         $this->recordEnrollment($user_id, $course_id);
         $this->messenger()->addMessage($this->t('Enrollment successful.'));
-        $this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
+        //$this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
       } else if ($now_date >= $course_start_date && $now_date <= $course_end_date) {
         $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');
       }
