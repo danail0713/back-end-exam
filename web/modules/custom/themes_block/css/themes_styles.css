@@ -18,7 +18,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #f8f8f8;
+  background-color: #f1f1f1;
   padding: 10px;
   border-bottom: 1px solid #ddd;
   font-weight: bold;
@@ -33,7 +33,7 @@
 }
 
 .toggle-btn {
-  background-color: #007bff;
+  background-color: #1a9ae3;
   color: #fff;
   border: none;
   border-radius: 3px;

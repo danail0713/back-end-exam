@@ -3,10 +3,7 @@
 declare(strict_types=1);
 
 namespace Drupal\themes_block\Plugin\Block;
-
 use Drupal\Core\Block\BlockBase;
-use Drupal\Core\Render\Element\Url;
-use Drupal\Core\Url as CoreUrl;
 use Drupal\file\Entity\File;
 use Drupal\node\Entity\Node;
 use Drupal\node\NodeInterface;

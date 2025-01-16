@@ -2,7 +2,7 @@ FROM drupal:php8.3-fpm-bullseye
 ARG DEBIAN_FRONTEND=noninteractive
 USER root
 RUN apt-get update -yq \
-    # Add updated php sources
+    # Add updated PHP sources
     && apt-get install curl -yq \
     && curl -sSL https://packages.sury.org/php/README.txt | bash -x \
     # Install some common packages
@@ -22,6 +22,9 @@ RUN apt-get update -yq \
     && rm installer \
     && rm -rf /var/lib/apt/lists/* \
     # Create a user
-    && useradd -m drupal -p drupal
+    && useradd -m drupal -p drupal \
+    # Change ownership of PHP config files to `drupal` user
+    && chown -R drupal:drupal /usr/local/etc/php
 USER drupal
 ENV SHELL /bin/bash
+
