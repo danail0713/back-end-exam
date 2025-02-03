@@ -18,13 +18,17 @@
 			<th>Enrollment time</th>
 		</tr>
 	</thead>
-	<tbody>
-		{% for enrollment in enrollments %}
-			<tr>
-				<td>{{ enrollment.student_name }}</td>
-				<td>{{ enrollment.course_name }}</td>
-				<td>{{ enrollment.enrollment_time }}</td>
-			</tr>
-		{% endfor %}
+	{% if enrollments %}
+		<tbody>
+			{% for enrollment in enrollments %}
+				<tr>
+					<td>{{ enrollment.student_name }}</td>
+					<td>{{ enrollment.course_name }}</td>
+					<td>{{ enrollment.enrollment_time }}</td>
+				</tr>
+			{% endfor %}
+		{% else %}
+			<p>No enrollments found.</p>
+		{% endif %}
 	</tbody>
 </table>

@@ -12,7 +12,7 @@
 					<div class="theme-body" id="theme-content-{{ loop.index }}">
 						<p class="theme-description">{{ theme.description }}</p>
 						<strong>Resources</strong>
-						{% if theme.resources and user_enrolled %}
+						{% if theme.resources and user_enrolled and theme.accessResources == true %}
 							<ul class="theme-resources">
 								{% for resource in theme.resources %}
 									<li>
@@ -20,11 +20,21 @@
 									</li>
 								{% endfor %}
 							</ul>
+              <br>
 						{% elseif not theme.resources %}
 							<p>No resources available.</p>
-            {% else %}
-              <p>You can't access resources because you aren't enrolled for this course.</p>
+						{% elseif not user_enrolled %}
+							<p>You can't access resources because you aren't enrolled for this course.</p>
+						{% elseif accessResources == false %}
+							<p>You can't access resources because you haven't made the homework from the previous theme.</p>
 						{% endif %}
+            {% if user_enrolled and theme.homework %}
+              <strong>Homework</strong>
+							<p>{{theme.homework|raw}}</p>
+            {% elseif not theme.homework and user_enrolled %}
+              <strong>Homework</strong>
+							<p>No homework yet.</p>
+            {% endif %}
 					</div>
 				</li>
 			{% endfor %}

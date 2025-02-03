@@ -1,4 +1,11 @@
 <h2>List of users</h2>
-{% for user in users %}
-  <h4>{{user.names}} - {{user.courses_count}} enrolled courses.</h4>
-{% endfor %}
+{% if courses %}
+	{% for user in users %}
+		<h4>{{user.names}}
+			-
+			{{user.courses_count}}
+			enrolled courses.</h4>
+	{% endfor %}
+{% else %}
+	<p>No courses found.</p>
+{% endif %}
