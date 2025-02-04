@@ -9,15 +9,13 @@ USER root
 RUN apt-get update -yq \
     && apt-get dist-upgrade -yq \
     # Install curl for future downloads
-    && apt-get install curl sudo -yq \
-    # Install MariaDB server and client instead of MySQL
-    && apt-get install mariadb-server mariadb-client -yq \
+    && apt-get install -yq curl sudo mariadb-server mariadb-client \
     # Install some common packages
-    && apt-get install git imagemagick nano vim openssh-server sqlite3 wget unzip -yq \
+    && apt-get install -yq git imagemagick nano vim openssh-server sqlite3 wget unzip \
     # Install PHP CLI with some extensions for Drupal development
     # Install NodeJS LTS
     && curl -sL https://deb.nodesource.com/setup_lts.x | bash \
-    && apt-get install nodejs -yq \
+    && apt-get install -yq nodejs \
     # Install Composer
     && wget https://getcomposer.org/installer \
     && php installer --install-dir=/usr/local/bin --filename=composer \
@@ -36,6 +34,15 @@ RUN apt-get update -yq \
     # Change ownership of PHP config files to `drupal` user
     && chown -R drupal:drupal /usr/local/etc/php
 
-# Switch to non-root user for the rest of the work
-USER drupal
-ENV SHELL /bin/bash
+# Copy the entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Expose the default MariaDB port
+EXPOSE 3306
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Start PHP-FPM as the main process
+CMD ["php-fpm"]
