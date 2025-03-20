@@ -18,12 +18,14 @@ interface TabTamerInterface extends ConfigEntityInterface {
   public function getTabs();
 
   /**
-   * Get tab amer entity by route name.
+   * Get tab tamer entity by route name.
    *
    * @param string $route
    *   Route.
    *
    * @return mixed
+   * @return static|null
+   *   The tab tamer entity or NULL if not found.
    */
   public static function getByRoute(string $route);
 

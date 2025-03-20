@@ -49,14 +49,6 @@ student_enrollment.most_enrolled_courses:
   requirements:
     _permission: 'access content'
 
-sorted-users-by-enrolled-courses:
-  path: 'courses/sorted-users-by-enrolled-courses'
-  defaults:
-    _title: 'Sorted users by enrolled courses'
-    _controller: '\Drupal\student_enrollment\Controller\SortedUsersByEnrolledCoursesController::build'
-  requirements:
-    _permission: 'access content'
-
 student_enrollment.config_emails:
   path: '/config-emails'
   defaults:

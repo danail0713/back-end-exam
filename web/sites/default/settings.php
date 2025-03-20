@@ -860,29 +860,30 @@ $settings['migrate_node_migrate_type_classic'] = FALSE;
 # if (file_exists($app_root . '/' . $site_path . '/settings.local.php')) {
 #   include $app_root . '/' . $site_path . '/settings.local.php';
 # }
-$databases['default']['default'] = [
+/*$databases['default']['default'] = [
   'database' => 'drupal:drupal@127.0.0.1:3306/drupal',
   'prefix' => '',
   'namespace' => 'Drupal\\sqlite\\Driver\\Database\\sqlite',
   'driver' => 'sqlite',
   'autoload' => 'core/modules/sqlite/src/Driver/Database/sqlite/',
+];*/
+$databases['default']['default'] = [
+  'database' => 'drupal',
+  'username' => 'drupal_user',
+  'password' => 'kus130702che',
+  'host' => '127.0.0.1', // or the IP address or host of your DB server
+  'port' => '3306',      // Default MySQL/MariaDB port
+  'driver' => 'mysql',   // This is where MariaDB is specified
+  'prefix' => '',        // You can leave this empty if you don't use table prefixes
+  'charset' => 'utf8mb4', // It's recommended to use utf8mb4 for better character support
 ];
-/*$databases = array(
-  'default' => array(
-    'default' => array(
-      'database' => 'your_database_name',
-      'username' => 'your_database_user',
-      'password' => 'your_database_password',
-      'host' => 'localhost', // or the IP address or host of your DB server
-      'port' => '3306',      // Default MySQL/MariaDB port
-      'driver' => 'mysql',   // This is where MariaDB is specified
-      'prefix' => '',        // You can leave this empty if you don't use table prefixes
-      'charset' => 'utf8mb4', // It's recommended to use utf8mb4 for better character support
-    ),
-  ),
-);*/
 
 $settings['config_sync_directory'] = 'sites/default/files/config_hLYx1A1QtVZOdDxot6JIn1S55gAG27E6zEfp-qOjlwS1_Rc-SITl8mdc0CEfKKWEKaiqY8Ljqg/sync';
 $settings["reverse_proxy"] = TRUE;
 $settings["reverse_proxy_addresses"] = ["127.0.0.1"];
 $settings["config_sync_directory"] = "../config/default";
+
+//hide the warnings
+/*error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);*/

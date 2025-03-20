@@ -1,0 +1,5 @@
+name: 'create_instructor_profiles'
+type: module
+description: 'Creates a instructor profile after a instructor content type is created.'
+package: Custom
+core_version_requirement: ^10 || ^11

@@ -1,0 +1,5 @@
+name: 'custom footer'
+type: module
+description: 'Changes footer in my course management system.'
+package: Custom
+core_version_requirement: ^10 || ^11

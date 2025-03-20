@@ -1,0 +1,7 @@
+admin_profile_view.view:
+  path: '/user/1'
+  defaults:
+    _title: 'Admin profile'
+    _controller: '\Drupal\admin_profile_view\Controller\AdminProfileViewController'
+  requirements:
+    _permission: 'access content'

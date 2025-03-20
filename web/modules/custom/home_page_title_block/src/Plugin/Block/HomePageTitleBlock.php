@@ -3,6 +3,7 @@
 namespace Drupal\home_page_title_block\Plugin\Block;
 
 use Drupal\Core\Block\BlockBase;
+use Drupal\views\Entity\View;
 
 /**
  * Provides an example block.

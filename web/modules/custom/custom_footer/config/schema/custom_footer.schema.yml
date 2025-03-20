@@ -1,0 +1,7 @@
+block.settings.custom_footer_bottom:
+  type: block_settings
+  label: 'Footer bottom content block'
+  mapping:
+    example:
+      type: string
+      label: Example

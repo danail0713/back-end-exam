@@ -1,14 +1,14 @@
 <?php
 
 namespace Drupal\student_enrollment\Form;
-
 use DateTime;
+use Drupal;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Render\Element\Date;
 use Drupal\node\Entity\Node;
 use Drupal\student_enrollment\Services\NotificationService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Provides a Student Enrollment form.
@@ -40,9 +40,16 @@ class StudentEnrollmentForm extends FormBase {
    * {@inheritdoc}
    */
   public function buildForm(array $form, FormStateInterface $form_state, $course_id = NULL) {
-    // Build the enrollment form elements here.
-    // Add a dropdown for selecting courses.
-    $course_name = Node::load($course_id)->label();
+
+    // Prevents administrators from enrolling for a course. They are redirected to 403 page(access denied).
+    $current_user = Drupal::currentUser();
+    if (in_array('administrator', $current_user->getRoles())) {
+      throw new AccessDeniedHttpException(); /* throws new exception for denied access to the current page.
+      The 403 page is displaying.*/
+    }
+    
+     // Build the enrollment form elements here.
+     $course_name = Node::load($course_id)->label();
     $form['course'] = [
       '#type' => 'label',
       '#title' => $this->t('<h2>Enroll for the ' . $course_name . ' course</h2>'),
@@ -58,7 +65,6 @@ class StudentEnrollmentForm extends FormBase {
 
     return $form;
   }
-
   /**
    * {@inheritdoc}
    */
@@ -79,15 +85,14 @@ class StudentEnrollmentForm extends FormBase {
 
     // Check if the user is already enrolled in the selected course.
     if (!$this->isUserEnrolled($user_id, $course_id)) {
-      if ($now_date < $course_start_date ) {
+      if ($now_date < $course_start_date) {
         // Record the enrollment.
         $this->recordEnrollment($user_id, $course_id);
         $this->messenger()->addMessage($this->t('Enrollment successful.'));
         //$this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
       } else if ($now_date >= $course_start_date && $now_date <= $course_end_date) {
         $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');
-      }
-      else {
+      } else {
         $this->messenger()->addMessage($this->t("This course has already ended. You can't enroll for it."), 'warning');
       }
     } else {
@@ -131,7 +136,7 @@ class StudentEnrollmentForm extends FormBase {
       ->fields([
         'user_id' => $user_id,
         'course_id' => $course_id,
-        'created' => date('Y/M/d H:i:s', \Drupal::time()->getRequestTime())
+        'created' =>  \Drupal::time()->getRequestTime()
       ])
       ->execute();
   }

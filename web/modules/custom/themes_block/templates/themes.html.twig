@@ -10,7 +10,7 @@
 						<button class="toggle-btn" aria-expanded="false" aria-controls="theme-content-{{ loop.index }}">+</button>
 					</div>
 					<div class="theme-body" id="theme-content-{{ loop.index }}">
-						<p class="theme-description">{{ theme.description }}</p>
+						<p class="theme-description">{{ theme.description|raw }}</p>
 						<strong>Resources</strong>
 						{% if theme.resources and user_enrolled and theme.accessResources == true %}
 							<ul class="theme-resources">

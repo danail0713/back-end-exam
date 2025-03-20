@@ -1,0 +1,30 @@
+<?php
+
+use Drupal\node\Entity\Node;
+
+/**
+ * Implements hook_install().
+ * This runs when the module is first installed.
+ */
+function create_instructor_profiles_install() {
+  $storage = \Drupal::entityTypeManager()->getStorage('node');
+
+  // Load all nodes of type 'instructor'.
+  $instructors = $storage->loadByProperties(['type' => 'instructor']);
+
+  foreach ($instructors as $instructor) {
+    if ($instructor instanceof Node) { // Ensure it's a Node entity
+      $name = $instructor->get('field_name');
+      $family = $instructor->get('field_family');
+        $title = $name . ' ' . $family;
+          // Create Instructor Profile.
+          $profile = Node::create([
+            'type' => 'instructor_profile',
+            'title' => $title,
+            'field_name' => ['value' => $name], // Ensure correct structure
+            'field_family' => ['value' => $family],
+          ]);
+          $profile->save();
+    }
+  }
+}

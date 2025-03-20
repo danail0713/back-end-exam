@@ -11,11 +11,6 @@ function student_enrollment_schema() {
   $schema['student_enrollments'] = [
     'description' => 'Table for storing student enrollments for courses.',
     'fields' => [
-      'id' => [
-        'type' => 'serial',
-        'not null' => true,
-        'description' => 'Primary Key: Unique enrollment ID.',
-      ],
       'user_id' => [
         'type' => 'int',
         'not null' => true,
@@ -27,12 +22,12 @@ function student_enrollment_schema() {
         'description' => 'Course ID of the enrolled course.',
       ],
       'created' => [
-        'type' => 'datetime',
+        'type' => 'int',
         'not null' => true,
         'description' => 'The time when the enrollment was created.',
       ],
     ],
-    'primary key' => ['id'],
+    'primary key' => ['user_id','course_id'],
     'indexes' => [
       'created' => ['created'],
     ],

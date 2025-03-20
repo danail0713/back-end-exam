@@ -1,4 +1,0 @@
-add_resourse.resourse:
-  title: Resourses
-  route_name: add_resourse.resourse
-  base_route: system.admin_content

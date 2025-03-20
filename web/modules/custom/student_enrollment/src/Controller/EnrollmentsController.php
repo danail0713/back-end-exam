@@ -27,7 +27,7 @@ class EnrollmentsController extends ControllerBase {
     foreach ($enrollments as $enrollment) {
       $student_name = User::load($enrollment->user_id)->getAccountName();
       $course_name = Node::load($enrollment->course_id)->label();
-      $enrollment_time = $enrollment->created;
+      $enrollment_time = date('Y-m-d H:i:s', $enrollment->created);
       $enrollment_for_render = [
         'student_name' => $student_name,
         'course_name' => $course_name,

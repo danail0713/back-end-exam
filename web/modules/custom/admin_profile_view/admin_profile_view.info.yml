@@ -1,0 +1,5 @@
+name: 'admin_profile_view'
+type: module
+description: 'Displays admin profile with username and edit link for profile.'
+package: Custom
+core_version_requirement: ^10 || ^11
