@@ -24,9 +24,9 @@
 						{% elseif not theme.resources %}
 							<p>No resources available.</p>
 						{% elseif not user_enrolled %}
-							<p>You can't access resources because you aren't enrolled for this course.</p>
+							<p>You haven't access rights to the resources.</p>
 						{% elseif accessResources == false %}
-							<p>You can't access resources because you haven't made the homework from the previous theme.</p>
+							<p>You can't access the resources because you haven't made the homework from the previous theme.</p>
 						{% endif %}
             {% if user_enrolled and theme.homework %}
               <strong>Homework</strong>

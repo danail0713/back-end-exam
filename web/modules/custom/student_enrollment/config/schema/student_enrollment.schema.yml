@@ -1,0 +1,7 @@
+block.settings.student_enrollment_my_enrolled_courses:
+  type: block_settings
+  label: 'My enrolled courses block'
+  mapping:
+    example:
+      type: string
+      label: Example

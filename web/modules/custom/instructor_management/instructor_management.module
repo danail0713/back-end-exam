@@ -1,0 +1,49 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\Entity\Node;
+use Drupal\user\Entity\User;
+use Drupal\profile\Entity\Profile;
+
+/**
+ * Implements hook_entity_presave() for nodes.
+ */
+function instructor_management_node_presave(EntityInterface $entity) {
+  if ($entity instanceof Node && $entity->bundle() === 'instructor') {
+    $first_name = trim($entity->get('field_first_name')->value);
+    $last_name = trim($entity->get('field_last_name')->value);
+    $entity->setTitle($first_name . ' ' . $last_name);
+  }
+}
+
+/**
+ * Implements hook_entity_insert() for nodes.
+ */
+function instructor_management_node_insert(EntityInterface $entity) {
+  // Ensure this is an Instructor node.
+  if ($entity instanceof Node && $entity->bundle() === 'instructor') {
+    // Get instructor details.
+    $first_name = trim($entity->get('field_first_name')->value);
+    $last_name = trim($entity->get('field_last_name')->value);
+    $email = trim($entity->get('field_email')->value);
+    $phone = trim($entity->get('field_phone')->value);
+    $username = $first_name . $last_name;
+      // Create a new user.
+      $user = User::create([
+        'name' => $username,
+        'mail' => $email,
+        'pass' => strtolower($username),
+        'status' => 1, // Active user.
+        'roles' => ['instructor'], // Assign the instructor role.
+      ]);
+      $user->save();
+      $profile = Profile::create([
+        'type' => 'instructor', // Ensure this matches the profile type machine name.
+        'uid' => $user->id(),
+        'field_first_name' => $first_name,
+        'field_last_name' => $last_name,
+        'field_mob' => $phone,
+      ]);
+      $profile->save();
+    }
+  }

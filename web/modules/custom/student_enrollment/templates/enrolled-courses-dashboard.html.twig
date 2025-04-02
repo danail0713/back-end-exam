@@ -1,4 +1,4 @@
-<h2>My enrolled courses</h2>
+<h3>My enrolled courses</h3>
 {% if courses %}
 	{% for course in courses %}
 		<a href="{{url('entity.node.canonical',{'node': course.id})}}">

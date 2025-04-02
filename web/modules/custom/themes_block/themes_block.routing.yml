@@ -1,0 +1,7 @@
+themes_block.add_theme:
+  path: '/admin/content/add-theme'
+  defaults:
+    _title: 'Add Theme'
+    _form: 'Drupal\themes_block\Form\AddThemeForm'
+  requirements:
+    _permission: 'access add theme form'

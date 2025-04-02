@@ -1,4 +1,0 @@
-administer mailgun:
-  title: Administer Mailgun
-  description: Perform administration tasks for the Mailgun email service.
-  restrict access: true

@@ -50,9 +50,6 @@ function student_enrollment_form_user_login_form_alter(&$form, FormStateInterfac
       'class' => ['user-reset-password-link'],
     ],
   ];
-  // Modify the description of the name field for username.
-  $form['name']['#description'] = new TranslatableMarkup('Username is a combination of first and last name of the user.
-  For example "IvanIvanov".');
 }
 
 

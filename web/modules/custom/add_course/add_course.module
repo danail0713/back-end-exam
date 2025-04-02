@@ -1,0 +1,14 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\node\Entity\Node;
+
+/**
+ * Implements hook_entity_presave() for nodes.
+ */
+function add_course_node_presave(EntityInterface $entity) {
+  if ($entity instanceof Node && $entity->bundle() === 'courses') {
+    $course_name = trim($entity->get('field_course_name')->value);
+    $entity->setTitle($course_name);
+  }
+}

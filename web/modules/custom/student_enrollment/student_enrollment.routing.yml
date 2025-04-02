@@ -17,14 +17,6 @@ student_enrollment.enroll:
     parameters:
       course_id: \d+
 
-student_enrollment.dashboard:
-  path: 'courses/student-dashboard'
-  defaults:
-    _title: 'Student Dashboard'
-    _controller: '\Drupal\student_enrollment\Controller\EnrollmentDashboardController::build'
-  requirements:
-    _permission: 'enroll for a course'
-
 student_enrollment.enrollments:
   path: '/admin/content/student-enrollments'
   defaults:

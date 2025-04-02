@@ -10,7 +10,7 @@ use Drupal\views\Entity\View;
  *
  * @Block(
  *   id = "home_page_title_block_example",
- *   admin_label = @Translation("Example"),
+ *   admin_label = @Translation("Home page title"),
  *   category = @Translation("Custom")
  * )
  */

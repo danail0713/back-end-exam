@@ -1,0 +1,7 @@
+instructor_management.log_in_instructor:
+  path: '/user/login/instructor'
+  defaults:
+    _title: 'Log in as an instructor'
+    _form: 'Drupal\instructor_management\Form\LogInAsInstructorForm'
+  requirements:
+    _permission: 'access content'

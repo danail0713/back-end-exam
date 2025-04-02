@@ -1,0 +1,5 @@
+name: 'Instructor management'
+type: module
+description: 'This module is responsible for managing instructor profiles, what permissions instructors have in the system and what pages he/she can see.'
+package: Custom
+core_version_requirement: ^10 || ^11

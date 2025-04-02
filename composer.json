@@ -27,7 +27,7 @@
         "drupal/devel": "^5.0",
         "drupal/easy_breadcrumb": "^2.0",
         "drupal/field_validation": "^1.1",
-        "drupal/mailgun": "^2.0",
+        "drupal/mailsystem": "^4.5",
         "drupal/menu_per_role": "^1.5",
         "drupal/paragraphs": "^1.16",
         "drupal/phpmailer_smtp": "^2.2",
@@ -37,7 +37,8 @@
         "drupal/tab_manager": "^1.0",
         "drupal/tabtamer": "^2.0@beta",
         "drupal/webform": "^6.2",
-        "drush/drush": "^13.3"
+        "drush/drush": "^13.3",
+        "mongodb/mongodb": "^1.21"
     },
     "conflict": {
         "drupal/drupal": "*"

@@ -23,8 +23,8 @@ final class FooterBottom extends BlockBase {
   public function build(): array {
     $year = date('Y'); // Get current year dynamically
     return [
-      '#markup' => $this->t("© $year All rights reserved."),
-      '#cache' => ['max-age' => 0], // Ensure it updates yearly
+      '#markup' => $this->t("© $year. All rights reserved."),
+      '#cache' => ['max-age' => 0], // Ensure it updates yearly as it is not cached.
     ];
   }
 }
