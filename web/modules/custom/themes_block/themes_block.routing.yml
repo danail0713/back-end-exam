@@ -1,7 +1,18 @@
 themes_block.add_theme:
-  path: '/admin/content/add-theme'
+  path: '/admin/content/themes/add'
   defaults:
     _title: 'Add Theme'
     _form: 'Drupal\themes_block\Form\AddThemeForm'
   requirements:
     _permission: 'access add theme form'
+
+themes_block.delete_theme:
+  path: '/admin/content/themes/delete'
+  defaults:
+    _title: 'Delete Theme'
+    _form: 'Drupal\themes_block\Form\DeleteThemeForm'
+  requirements:
+    _permission: 'access delete theme form'
+
+themes_block.themes:
+  path: '/admin/content/themes'

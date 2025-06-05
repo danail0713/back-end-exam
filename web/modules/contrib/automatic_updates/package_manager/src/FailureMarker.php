@@ -1,12 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
-use Drupal\Component\Serialization\Json;
+use Drupal\package_manager\Event\CollectPathsToExcludeEvent;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Component\Yaml\Exception\ParseException;
+use Symfony\Component\Yaml\Yaml;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\package_manager\Exception\ApplyFailedException;
+use Drupal\package_manager\Exception\StageFailureMarkerException;
 
 /**
  * Handles failure marker file operation.
@@ -16,24 +19,15 @@ use Drupal\package_manager\Exception\ApplyFailedException;
  * know if a commit operation failed midway through, which could leave the site
  * code base in an indeterminate state -- which, in the worst case scenario,
  * might render Drupal being unable to boot.
+ *
+ * @internal
+ *   This is an internal part of Package Manager and may be changed or removed
+ *   at any time without warning. External code should not interact with this
+ *   class.
  */
-final class FailureMarker {
+final class FailureMarker implements EventSubscriberInterface {
 
-  /**
-   * The path locator service.
-   *
-   * @var \Drupal\package_manager\PathLocator
-   */
-  protected $pathLocator;
-
-  /**
-   * Constructs a FailureMarker object.
-   *
-   * @param \Drupal\package_manager\PathLocator $pathLocator
-   *   The path locator service.
-   */
-  public function __construct(PathLocator $pathLocator) {
-    $this->pathLocator = $pathLocator;
+  public function __construct(private readonly PathLocator $pathLocator) {
   }
 
   /**
@@ -43,7 +37,7 @@ final class FailureMarker {
    *   The absolute path of the marker file.
    */
   public function getPath(): string {
-    return $this->pathLocator->getProjectRoot() . '/PACKAGE_MANAGER_FAILURE.json';
+    return $this->pathLocator->getProjectRoot() . '/PACKAGE_MANAGER_FAILURE.yml';
   }
 
   /**
@@ -56,40 +50,114 @@ final class FailureMarker {
   /**
    * Writes data to marker file.
    *
-   * @param \Drupal\package_manager\Stage $stage
+   * @param \Drupal\package_manager\StageBase $stage
    *   The stage.
    * @param \Drupal\Core\StringTranslation\TranslatableMarkup $message
    *   Failure message to be added.
+   * @param \Throwable|null $throwable
+   *   (optional) The throwable that caused the failure.
    */
-  public function write(Stage $stage, TranslatableMarkup $message): void {
+  public function write(StageBase $stage, TranslatableMarkup $message, ?\Throwable $throwable = NULL): void {
     $data = [
       'stage_class' => get_class($stage),
+      'stage_type' => $stage->getType(),
       'stage_file' => (new \ReflectionObject($stage))->getFileName(),
-      'message' => $message,
+      'message' => (string) $message,
+      'throwable_class' => $throwable ? get_class($throwable) : FALSE,
+      'throwable_message' => $throwable?->getMessage() ?? 'Not available',
+      'throwable_backtrace' => $throwable?->getTraceAsString() ?? 'Not available.',
     ];
-    file_put_contents($this->getPath(), Json::encode($data));
+    file_put_contents($this->getPath(), Yaml::dump($data));
+  }
+
+  /**
+   * Gets the data from the file if it exists.
+   *
+   * @return array|null
+   *   The data from the file if it exists.
+   *
+   * @throws \Drupal\package_manager\Exception\StageFailureMarkerException
+   *   Thrown if failure marker exists but cannot be decoded.
+   */
+  private function getData(): ?array {
+    $path = $this->getPath();
+    if (file_exists($path)) {
+      $data = file_get_contents($path);
+      try {
+        return Yaml::parse($data);
+
+      }
+      catch (ParseException $exception) {
+        throw new StageFailureMarkerException('Failure marker file exists but cannot be decoded.', $exception->getCode(), $exception);
+      }
+    }
+    return NULL;
+  }
+
+  /**
+   * Gets the message from the file if it exists.
+   *
+   * @param bool $include_backtrace
+   *   Whether to include the backtrace in the message. Defaults to TRUE. May be
+   *   set to FALSE in a context where it does not make sense to include, such
+   *   as emails.
+   *
+   * @return string|null
+   *   The message from the file if it exists, otherwise NULL.
+   *
+   * @throws \Drupal\package_manager\Exception\StageFailureMarkerException
+   *   Thrown if failure marker exists but cannot be decoded.
+   */
+  public function getMessage(bool $include_backtrace = TRUE): ?string {
+    $data = $this->getData();
+    if ($data === NULL) {
+      return NULL;
+    }
+    $message = $data['message'];
+    if ($data['throwable_class']) {
+      $message .= sprintf(
+        ' Caused by %s, with this message: %s',
+        $data['throwable_class'],
+        $data['throwable_message'],
+      );
+      if ($include_backtrace) {
+        $message .= "\nBacktrace:\n" . $data['throwable_backtrace'];
+      }
+    }
+    return $message;
   }
 
   /**
    * Asserts the failure file doesn't exist.
    *
-   * @throws \Drupal\package_manager\Exception\ApplyFailedException
+   * @throws \Drupal\package_manager\Exception\StageFailureMarkerException
    *   Thrown if the marker file exists.
    */
   public function assertNotExists(): void {
-    $path = $this->getPath();
-
-    if (file_exists($path)) {
-      $data = file_get_contents($path);
-      try {
-        $data = json_decode($data, TRUE, 512, JSON_THROW_ON_ERROR);
-      }
-      catch (\JsonException $exception) {
-        throw new ApplyFailedException('Failure marker file exists but cannot be decoded.', $exception->getCode(), $exception);
-      }
-
-      throw new ApplyFailedException($data['message']);
+    if ($message = $this->getMessage()) {
+      throw new StageFailureMarkerException($message);
     }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function getSubscribedEvents(): array {
+    return [
+      CollectPathsToExcludeEvent::class => 'excludeMarkerFile',
+    ];
+  }
+
+  /**
+   * Excludes the failure marker file from stage operations.
+   *
+   * @param \Drupal\package_manager\Event\CollectPathsToExcludeEvent $event
+   *   The event being handled.
+   */
+  public function excludeMarkerFile(CollectPathsToExcludeEvent $event): void {
+    $event->addPathsRelativeToProjectRoot([
+      $this->getPath(),
+    ]);
   }
 
 }

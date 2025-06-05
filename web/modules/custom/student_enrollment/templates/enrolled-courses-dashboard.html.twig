@@ -1,10 +1,11 @@
-<h3>My enrolled courses</h3>
+<h3>{{ 'My enrolled courses'|t }}</h3>
+
 {% if courses %}
 	{% for course in courses %}
-		<a href="{{url('entity.node.canonical',{'node': course.id})}}">
+		<a href="{{ url('entity.node.canonical', {'node': course.id}) }}">
 			<h4>{{ course.label }}</h4>
 		</a>
 	{% endfor %}
 {% else %}
-	<p>No enrolled courses found.</p>
+	<p>{{ 'No enrolled courses found.'|t }}</p>
 {% endif %}

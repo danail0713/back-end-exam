@@ -1,15 +1,21 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
+use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\package_manager\ComposerInspector;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\Event\PreRequireEvent;
+use Drupal\package_manager\Exception\StageException;
+use Drupal\package_manager\InstalledPackagesList;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\Validator\LockFileValidator;
 use Drupal\package_manager\ValidationResult;
 use Drupal\package_manager_bypass\NoOpStager;
+use Prophecy\Argument;
 
 /**
  * @coversDefaultClass \Drupal\package_manager\Validator\LockFileValidator
@@ -30,8 +36,30 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->activeDir = $this->container->get('package_manager.path_locator')
+    $this->activeDir = $this->container->get(PathLocator::class)
       ->getProjectRoot();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function register(ContainerBuilder $container) {
+    parent::register($container);
+
+    // Temporarily mock the Composer inspector to prevent it from complaining
+    // over the lack of a lock file if it's invoked by other validators.
+    $inspector = $this->prophesize(ComposerInspector::class);
+    $arguments = Argument::cetera();
+    $inspector->getConfig('allow-plugins', $arguments)->willReturn('[]');
+    $inspector->getConfig('secure-http', $arguments)->willReturn('true');
+    $inspector->getConfig('disable-tls', $arguments)->willReturn('false');
+    $inspector->getConfig('extra', $arguments)->willReturn('{}');
+    $inspector->getConfig('minimum-stability', $arguments)->willReturn('stable');
+    $inspector->getInstalledPackagesList($arguments)->willReturn(new InstalledPackagesList());
+    $inspector->getAllowPluginsConfig($arguments)->willReturn([]);
+    $inspector->validate($arguments);
+    $inspector->getRootPackageInfo($arguments)->willReturn([]);
+    $container->set(ComposerInspector::class, $inspector->reveal());
   }
 
   /**
@@ -41,8 +69,11 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
    */
   public function testCreateWithNoLock(): void {
     unlink($this->activeDir . '/composer.lock');
-
-    $no_lock = ValidationResult::createError([t('Could not hash the active lock file.')]);
+    $project_root = $this->container->get(PathLocator::class)->getProjectRoot();
+    $lock_file_path = $project_root . DIRECTORY_SEPARATOR . 'composer.lock';
+    $no_lock = ValidationResult::createError([
+      t('The active lock file (@file) does not exist.', ['@file' => $lock_file_path]),
+    ]);
     $stage = $this->assertResults([$no_lock], PreCreateEvent::class);
     // The stage was not created successfully, so the status check should be
     // clear.
@@ -75,13 +106,14 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
     // priority of 0, this listener changes lock file before the validator
     // runs.
     $this->addEventTestListener(function () {
-      $lock = json_decode(file_get_contents($this->activeDir . '/composer.lock'), TRUE);
+      $lock = json_decode(file_get_contents($this->activeDir . '/composer.lock'), TRUE, flags: JSON_THROW_ON_ERROR);
       $lock['extra']['key'] = 'value';
       file_put_contents($this->activeDir . '/composer.lock', json_encode($lock, JSON_THROW_ON_ERROR));
     }, $event_class);
     $result = ValidationResult::createError([
-      t('Unexpected changes were detected in composer.lock, which indicates that other Composer operations were performed since this Package Manager operation started. This can put the code base into an unreliable state and therefore is not allowed.'),
-    ]);
+      t('Unexpected changes were detected in the active lock file (@file), which indicates that other Composer operations were performed since this Package Manager operation started. This can put the code base into an unreliable state and therefore is not allowed.',
+       ['@file' => $this->activeDir . '/composer.lock']),
+    ], t('Problem detected in lock file during stage operations.'));
     $stage = $this->assertResults([$result], $event_class);
     // A status check should agree that there is an error here.
     $this->assertStatusCheckResults([$result], $stage);
@@ -101,15 +133,17 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
       unlink($this->activeDir . '/composer.lock');
     }, $event_class);
     $result = ValidationResult::createError([
-      t('Could not hash the active lock file.'),
-    ]);
+      t('The active lock file (@file) does not exist.', [
+        '@file' => $this->activeDir . '/composer.lock',
+      ]),
+    ], t('Problem detected in lock file during stage operations.'));
     $stage = $this->assertResults([$result], $event_class);
     // A status check should agree that there is an error here.
     $this->assertStatusCheckResults([$result], $stage);
   }
 
   /**
-   * Tests validation when a stored hash of the active lock file is unavailable.
+   * Tests exception when a stored hash of the active lock file is unavailable.
    *
    * @dataProvider providerValidateStageEvents
    */
@@ -118,18 +152,23 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
     $state_key = $reflector->getValue();
 
     // Add a listener with an extremely high priority to the same event that
-    // should raise the validation error. Because the validator uses the default
+    // should throw an exception. Because the validator uses the default
     // priority of 0, this listener deletes stored hash before the validator
     // runs.
     $this->addEventTestListener(function () use ($state_key) {
       $this->container->get('state')->delete($state_key);
     }, $event_class);
-    $result = ValidationResult::createError([
-      t('Could not retrieve stored hash of the active lock file.'),
-    ]);
-    $stage = $this->assertResults([$result], $event_class);
-    // A status check should agree that there is an error here.
-    $this->assertStatusCheckResults([$result], $stage);
+
+    $stage = $this->createStage();
+    $stage->create();
+    try {
+      $stage->require(['drupal/core:9.8.1']);
+      $stage->apply();
+    }
+    catch (StageException $e) {
+      $this->assertSame(\LogicException::class, $e->getPrevious()::class);
+      $this->assertSame('Stored hash key deleted.', $e->getMessage());
+    }
   }
 
   /**
@@ -140,8 +179,8 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
     NoOpStager::setLockFileShouldChange(FALSE);
 
     $result = ValidationResult::createError([
-      t('There are no pending Composer operations.'),
-    ]);
+      t('There appear to be no pending Composer operations because the active lock file (<PROJECT_ROOT>/composer.lock) and the staged lock file (<STAGE_DIR>/composer.lock) are identical.'),
+    ], t('Problem detected in lock file during stage operations.'));
     $stage = $this->assertResults([$result], PreApplyEvent::class);
     // A status check shouldn't produce raise any errors, because it's only
     // during pre-apply that we care if there are any pending Composer
@@ -162,7 +201,7 @@ class LockFileValidatorTest extends PackageManagerKernelTestBase {
    * @return string[][]
    *   The test cases.
    */
-  public function providerValidateStageEvents(): array {
+  public static function providerValidateStageEvents(): array {
     return [
       'pre-require' => [
         PreRequireEvent::class,

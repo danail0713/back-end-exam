@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
@@ -8,6 +8,7 @@ use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\ValidationResult;
 use Drupal\Component\Utility\Bytes;
+use Drupal\package_manager\Validator\DiskSpaceValidator;
 
 /**
  * @covers \Drupal\package_manager\Validator\DiskSpaceValidator
@@ -22,14 +23,14 @@ class DiskSpaceValidatorTest extends PackageManagerKernelTestBase {
    * @return mixed[][]
    *   The test cases.
    */
-  public function providerDiskSpaceValidation(): array {
+  public static function providerDiskSpaceValidation(): array {
     // @see \Drupal\Tests\package_manager\Traits\ValidationTestTrait::resolvePlaceholdersInArrayValuesWithRealPaths()
     $root = '<PROJECT_ROOT>';
     $vendor = '<VENDOR_DIR>';
 
-    $root_insufficient = "Drupal root filesystem \"$root\" has insufficient space. There must be at least 1024 megabytes free.";
-    $vendor_insufficient = "Vendor filesystem \"$vendor\" has insufficient space. There must be at least 1024 megabytes free.";
-    $temp_insufficient = 'Directory "temp" has insufficient space. There must be at least 1024 megabytes free.';
+    $root_insufficient = t('Drupal root filesystem "<PROJECT_ROOT>" has insufficient space. There must be at least 1024 megabytes free.');
+    $vendor_insufficient = t('Vendor filesystem "<VENDOR_DIR>" has insufficient space. There must be at least 1024 megabytes free.');
+    $temp_insufficient = t('Directory "temp" has insufficient space. There must be at least 1024 megabytes free.');
     $summary = t("There is not enough disk space to create a stage directory.");
 
     return [
@@ -149,7 +150,7 @@ class DiskSpaceValidatorTest extends PackageManagerKernelTestBase {
     $free_space = array_flip($this->resolvePlaceholdersInArrayValuesWithRealPaths(array_flip($free_space)));
 
     /** @var \Drupal\Tests\package_manager\Kernel\TestDiskSpaceValidator $validator */
-    $validator = $this->container->get('package_manager.validator.disk_space');
+    $validator = $this->container->get(DiskSpaceValidator::class);
     $validator->sharedDisk = $shared_disk;
     $validator->freeSpace = array_map([Bytes::class, 'toNumber'], $free_space);
 
@@ -177,7 +178,7 @@ class DiskSpaceValidatorTest extends PackageManagerKernelTestBase {
 
     $this->addEventTestListener(function () use ($shared_disk, $free_space): void {
       /** @var \Drupal\Tests\package_manager\Kernel\TestDiskSpaceValidator $validator */
-      $validator = $this->container->get('package_manager.validator.disk_space');
+      $validator = $this->container->get(DiskSpaceValidator::class);
       $validator->sharedDisk = $shared_disk;
       $validator->freeSpace = array_map([Bytes::class, 'toNumber'], $free_space);
     });

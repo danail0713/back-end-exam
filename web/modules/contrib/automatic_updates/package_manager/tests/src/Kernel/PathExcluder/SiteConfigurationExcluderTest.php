@@ -1,11 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel\PathExcluder;
 
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\package_manager\PathExcluder\SiteConfigurationExcluder;
+use Drupal\package_manager\PathLocator;
 use Drupal\Tests\package_manager\Kernel\PackageManagerKernelTestBase;
 
 /**
@@ -18,21 +19,10 @@ class SiteConfigurationExcluderTest extends PackageManagerKernelTestBase {
   /**
    * {@inheritdoc}
    */
-  protected function setUp(): void {
-    // In this test, we want to disable the lock file validator because, even
-    // though both the active and stage directories will have a valid lock file,
-    // this validator will complain because they don't differ at all.
-    $this->disableValidators[] = 'package_manager.validator.lock_file';
-    parent::setUp();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function register(ContainerBuilder $container) {
     parent::register($container);
 
-    $container->getDefinition('package_manager.site_configuration_excluder')
+    $container->getDefinition(SiteConfigurationExcluder::class)
       ->setClass(TestSiteConfigurationExcluder::class);
   }
 
@@ -46,30 +36,29 @@ class SiteConfigurationExcluderTest extends PackageManagerKernelTestBase {
     // Ensure we have an up-to-date container.
     $this->container = $this->container->get('kernel')->rebuildContainer();
 
-    $active_dir = $this->container->get('package_manager.path_locator')
-      ->getProjectRoot();
+    $active_dir = $this->container->get(PathLocator::class)->getProjectRoot();
 
     $site_path = 'sites/example.com';
 
     // Update the event subscribers' dependencies.
-    /** @var \Drupal\Tests\package_manager\Kernel\PathExcluder\TestSiteConfigurationExcluder $site_configuration_excluder */
-    $site_configuration_excluder = $this->container->get('package_manager.site_configuration_excluder');
+    $site_configuration_excluder = $this->container->get(SiteConfigurationExcluder::class);
     $site_configuration_excluder->sitePath = $site_path;
 
     $stage = $this->createStage();
     $stage->create();
+    $stage->require(['ext-json:*']);
     $stage_dir = $stage->getStageDirectory();
 
-    $ignore = [
+    $excluded = [
       "$site_path/settings.php",
       "$site_path/settings.local.php",
       "$site_path/services.yml",
-      // Default site-specific settings files should be ignored.
+      // Default site-specific settings files should be excluded.
       'sites/default/settings.php',
       'sites/default/settings.local.php',
       'sites/default/services.yml',
     ];
-    foreach ($ignore as $path) {
+    foreach ($excluded as $path) {
       $this->assertFileExists("$active_dir/$path");
       $this->assertFileDoesNotExist("$stage_dir/$path");
     }
@@ -85,10 +74,38 @@ class SiteConfigurationExcluderTest extends PackageManagerKernelTestBase {
     $stage->apply();
     $this->assertFileExists("$active_dir/sites/default/new.txt");
 
-    // The ignored files should still be in the active directory.
-    foreach ($ignore as $path) {
+    // The excluded files should still be in the active directory.
+    foreach ($excluded as $path) {
       $this->assertFileExists("$active_dir/$path");
     }
+  }
+
+  /**
+   * Tests that `sites/default` is made writable in the stage directory.
+   */
+  public function testDefaultSiteDirectoryPermissions(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
+    $live_dir = $project_root . '/sites/default';
+    chmod($live_dir, 0555);
+    $this->assertDirectoryIsNotWritable($live_dir);
+    // Record the permissions of the directory now, so we can be sure those
+    // permissions are restored after apply.
+    $original_permissions = fileperms($live_dir);
+    $this->assertIsInt($original_permissions);
+
+    $stage = $this->createStage();
+    $stage->create();
+    // The staged `sites/default` will be made world-writable, because we want
+    // to ensure the scaffold plugin can copy certain files into there.
+    $staged_dir = str_replace($project_root, $stage->getStageDirectory(), $live_dir);
+    $this->assertDirectoryIsWritable($staged_dir);
+
+    $stage->require(['ext-json:*']);
+    $stage->apply();
+    // After applying, the live directory should NOT inherit the staged
+    // directory's world-writable permissions.
+    $this->assertSame($original_permissions, fileperms($live_dir));
   }
 
 }
@@ -101,6 +118,6 @@ class TestSiteConfigurationExcluder extends SiteConfigurationExcluder {
   /**
    * {@inheritdoc}
    */
-  public $sitePath;
+  public string $sitePath;
 
 }

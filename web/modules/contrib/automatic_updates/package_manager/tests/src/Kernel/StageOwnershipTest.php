@@ -1,18 +1,14 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
-use Drupal\Core\File\FileSystem;
-use Drupal\Core\Logger\RfcLogLevel;
-use Drupal\package_manager\Event\PostDestroyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\Exception\StageException;
 use Drupal\package_manager\Exception\StageOwnershipException;
 use Drupal\package_manager_test_validation\EventSubscriber\TestSubscriber;
 use Drupal\Tests\user\Traits\UserCreationTrait;
-use ColinODell\PsrTestLogger\TestLogger;
 
 /**
  * Tests that ownership of the stage is enforced.
@@ -38,8 +34,6 @@ class StageOwnershipTest extends PackageManagerKernelTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->installSchema('system', ['sequences']);
-    $this->installSchema('user', ['users_data']);
     $this->installEntitySchema('user');
   }
 
@@ -243,101 +237,6 @@ class StageOwnershipTest extends PackageManagerKernelTestBase {
     }
     // We should be able to destroy the stage if we ignore ownership.
     $not_owned->destroy(TRUE);
-  }
-
-  /**
-   * Tests that the stage is available if ::destroy() has a file system error.
-   */
-  public function testStageDestroyedWithFileSystemError(): void {
-    $logger_channel = $this->container->get('logger.channel.file');
-    $arguments = [
-      $this->container->get('stream_wrapper_manager'),
-      $this->container->get('settings'),
-      $logger_channel,
-    ];
-    $this->assertSame(E_ALL, error_reporting());
-    $this->container->set('file_system', new class (...$arguments) extends FileSystem {
-
-      /**
-       * {@inheritdoc}
-       */
-      public function chmod($uri, $mode = NULL) {
-        // Normally, the stage will call this method as it tries to make
-        // everything in the stage directory writable so it can be deleted. We
-        // don't wan't to do that in this test, since we're specifically testing
-        // what happens when we try to delete a stage directory with
-        // write-protected files.
-      }
-
-      /**
-       * {@inheritdoc}
-       */
-      public function unlink($uri, $context = NULL) {
-        // PHP's unlink() will generate a warning upon failure, which PHPUnit's
-        // error handler will convert to an exception. This happens because all
-        // tests run with E_ALL. But production sites either have E_ALL disabled
-        // or they catch and log it. So: match that behavior in the test, but
-        // only for this single method, to still maximally catch errors.
-        // @see https://www.php.net/manual/en/function.unlink.php,
-        // @see \ERROR_REPORTING_HIDE
-        error_reporting(E_ALL & ~E_WARNING);
-        $result = parent::unlink($uri, $context);
-        error_reporting(E_ALL);
-        return $result;
-      }
-
-      /**
-       * {@inheritdoc}
-       */
-      public function rmdir($uri, $context = NULL) {
-        // PHP's rmdir() will generate a warning upon failure, which PHPUnit's
-        // error handler will convert to an exception. This happens because all
-        // tests run with E_ALL. But production sites either have E_ALL disabled
-        // or they catch and log it. So: match that behavior in the test, but
-        // only for this single method, to still maximally catch errors.
-        // @see https://php.net/manual/en/function.rmdir.php,
-        // @see \ERROR_REPORTING_HIDE
-        error_reporting(E_ALL & ~E_WARNING);
-        $result = parent::rmdir($uri, $context);
-        error_reporting(E_ALL);
-        return $result;
-      }
-
-    });
-
-    $stage = $this->createStage();
-    $this->assertTrue($stage->isAvailable());
-    $stage->create();
-    $this->assertFalse($stage->isAvailable());
-
-    // Write-protect the stage directory, which should prevent files in it from
-    // being deleted.
-    $dir = $stage->getStageDirectory();
-    chmod($dir, 0500);
-    $this->assertDirectoryIsNotWritable($dir);
-
-    $logger = new TestLogger();
-    $logger_channel->addLogger($logger);
-
-    // Listen to the post-destroy event so we can confirm that it was fired, and
-    // the stage was made available, despite the file system error.
-    $stage_available = NULL;
-    $this->addEventTestListener(function (PostDestroyEvent $event) use (&$stage_available): void {
-      $stage_available = $event->getStage()->isAvailable();
-    }, PostDestroyEvent::class);
-    $stage->destroy();
-    $this->assertTrue($stage_available);
-
-    // A file system error should have been logged while trying to delete the
-    // stage directory.
-    $predicate = function (array $record) use ($dir): bool {
-      return (
-        $record['message'] === "Failed to unlink file '%path'." &&
-        isset($record['context']['%path']) &&
-        str_contains($record['context']['%path'], $dir)
-      );
-    };
-    $this->assertTrue($logger->hasRecordThatPasses($predicate, (string) RfcLogLevel::ERROR));
   }
 
 }

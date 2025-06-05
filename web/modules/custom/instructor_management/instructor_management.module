@@ -9,7 +9,7 @@ use Drupal\profile\Entity\Profile;
  * Implements hook_entity_presave() for nodes.
  */
 function instructor_management_node_presave(EntityInterface $entity) {
-  if ($entity instanceof Node && $entity->bundle() === 'instructor') {
+  if ($entity instanceof Node && $entity->bundle() == 'instructor') {
     $first_name = trim($entity->get('field_first_name')->value);
     $last_name = trim($entity->get('field_last_name')->value);
     $entity->setTitle($first_name . ' ' . $last_name);
@@ -47,3 +47,14 @@ function instructor_management_node_insert(EntityInterface $entity) {
       $profile->save();
     }
   }
+
+/**
+ * Implements hook_theme().
+ */
+function instructor_management_theme(): array {
+  return [
+    'courses' => [
+      'variables' => ['instructor_courses' => NULL],
+    ],
+  ];
+}

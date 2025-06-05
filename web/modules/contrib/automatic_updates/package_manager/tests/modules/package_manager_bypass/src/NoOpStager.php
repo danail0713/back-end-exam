@@ -1,15 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager_bypass;
 
 use Composer\Json\JsonFile;
 use Drupal\Core\State\StateInterface;
-use PhpTuf\ComposerStager\Domain\Core\Stager\StagerInterface;
-use PhpTuf\ComposerStager\Domain\Service\ProcessOutputCallback\ProcessOutputCallbackInterface;
-use PhpTuf\ComposerStager\Domain\Service\ProcessRunner\ProcessRunnerInterface;
-use PhpTuf\ComposerStager\Domain\Value\Path\PathInterface;
+use PhpTuf\ComposerStager\API\Core\StagerInterface;
+use PhpTuf\ComposerStager\API\Path\Value\PathInterface;
+use PhpTuf\ComposerStager\API\Process\Service\OutputCallbackInterface;
+use PhpTuf\ComposerStager\API\Process\Service\ProcessInterface;
 
 /**
  * A composer-stager Stager implementation that does nothing, except logging.
@@ -27,6 +27,7 @@ use PhpTuf\ComposerStager\Domain\Value\Path\PathInterface;
  */
 final class NoOpStager implements StagerInterface {
 
+  use ComposerStagerExceptionTrait;
   use LoggingDecoratorTrait;
 
   /**
@@ -42,12 +43,13 @@ final class NoOpStager implements StagerInterface {
   /**
    * {@inheritdoc}
    */
-  public function stage(array $composerCommand, PathInterface $activeDir, PathInterface $stagingDir, ?ProcessOutputCallbackInterface $callback = NULL, ?int $timeout = ProcessRunnerInterface::DEFAULT_TIMEOUT): void {
+  public function stage(array $composerCommand, PathInterface $activeDir, PathInterface $stagingDir, ?OutputCallbackInterface $callback = NULL, ?int $timeout = ProcessInterface::DEFAULT_TIMEOUT): void {
     $this->saveInvocationArguments($composerCommand, $stagingDir, $timeout);
+    $this->throwExceptionIfSet();
 
     // If desired, simulate a change to the lock file (e.g., as a result of
     // running `composer update`).
-    $lockFile = new JsonFile($stagingDir->resolve() . '/composer.lock');
+    $lockFile = new JsonFile($stagingDir->absolute() . '/composer.lock');
     $changeLockFile = $this->state->get(static::class . ' lock', TRUE);
 
     if ($changeLockFile && $lockFile->exists()) {

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -19,7 +19,7 @@ class SuccessfulUpdateTest extends UpdaterFormTestBase {
    * @return string[][]
    *   The test cases.
    */
-  public function providerSuccessfulUpdate(): array {
+  public static function providerSuccessfulUpdate(): array {
     return [
       'Modules page, maintenance mode on' => [
         '/admin/modules/update',
@@ -61,7 +61,7 @@ class SuccessfulUpdateTest extends UpdaterFormTestBase {
     $cached_message = $this->setAndAssertCachedMessage();
 
     $this->drupalGet($update_form_url);
-    $assert_session->pageTextNotContains($cached_message);
+    $assert_session->pageTextNotContains($cached_message->render());
     $page->pressButton('Update to 9.8.1');
     $this->checkForMetaRefresh();
     $this->assertUpdateStagedTimes(1);
@@ -71,7 +71,7 @@ class SuccessfulUpdateTest extends UpdaterFormTestBase {
     $page->pressButton('Continue');
     $this->checkForMetaRefresh();
     $assert_session->addressEquals('/admin/reports/updates');
-    $assert_session->pageTextNotContains($cached_message);
+    $assert_session->pageTextNotContains($cached_message->render());
     // Confirm that the site was in maintenance before the update was applied.
     // @see \Drupal\package_manager_test_validation\EventSubscriber\TestSubscriber::handleEvent()
     $this->assertTrue($state->get(PreApplyEvent::class . '.system.maintenance_mode'));

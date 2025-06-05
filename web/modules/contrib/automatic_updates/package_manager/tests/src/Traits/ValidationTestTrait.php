@@ -1,12 +1,14 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Traits;
 
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\KernelTests\KernelTestBase;
 use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ValidationResult;
+use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\UnitTestCase;
 
 /**
@@ -53,7 +55,8 @@ trait ValidationTestTrait {
    * @param array $subject
    *   An array with arbitrary keys, and values potentially containing the
    *   placeholders <PROJECT_ROOT>, <VENDOR_DIR>, <STAGE_ROOT>, or
-   *   <STAGE_ROOT_PARENT>.
+   *   <STAGE_ROOT_PARENT>. <STAGE_DIR> is the placeholder for $stage_dir, if
+   *   passed.
    * @param \Drupal\package_manager\PathLocator|null $path_locator
    *   (optional) The path locator (when this trait is used in unit tests).
    * @param string|null $stage_dir
@@ -64,7 +67,9 @@ trait ValidationTestTrait {
    */
   protected function resolvePlaceholdersInArrayValuesWithRealPaths(array $subject, ?PathLocator $path_locator = NULL, ?string $stage_dir = NULL): array {
     if (!$path_locator) {
-      $path_locator = $this->container->get('package_manager.path_locator');
+      // Only kernel and browser tests have $this->container.
+      assert($this instanceof KernelTestBase || $this instanceof BrowserTestBase);
+      $path_locator = $this->container->get(PathLocator::class);
     }
     $subject = str_replace(
       ['<PROJECT_ROOT>', '<VENDOR_DIR>', '<STAGE_ROOT>', '<STAGE_ROOT_PARENT>'],
@@ -97,6 +102,7 @@ trait ValidationTestTrait {
   protected function getValidationResultsAsArray(array $results): array {
     $string_translation_stub = NULL;
     if (is_a(get_called_class(), UnitTestCase::class, TRUE)) {
+      assert($this instanceof UnitTestCase);
       $string_translation_stub = $this->getStringTranslationStub();
     }
     return array_values(array_map(static function (ValidationResult $result) use ($string_translation_stub) {
@@ -106,15 +112,15 @@ trait ValidationTestTrait {
           $message = new TranslatableMarkup($message->getUntranslatedString(), $message->getArguments(), $message->getOptions(), $string_translation_stub);
         }
         return (string) $message;
-      }, $result->getMessages());
+      }, $result->messages);
 
-      $summary = $result->getSummary();
+      $summary = $result->summary;
       if ($summary !== NULL) {
-        $summary = (string) $result->getSummary();
+        $summary = (string) $result->summary;
       }
 
       return [
-        'severity' => $result->getSeverity(),
+        'severity' => $result->severity,
         'messages' => $messages,
         'summary' => $summary,
       ];

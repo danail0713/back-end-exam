@@ -1,16 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates_extensions\Form;
 
 use Drupal\automatic_updates\Form\UpdateFormBase;
-use Drupal\package_manager\Exception\ApplyFailedException;
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\Exception\StageFailureMarkerException;
+use Drupal\package_manager\InstalledPackage;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ProjectInfo;
 use Drupal\package_manager\ValidationResult;
 use Drupal\automatic_updates_extensions\BatchProcessor;
 use Drupal\automatic_updates\BatchProcessor as AutoUpdatesBatchProcessor;
-use Drupal\automatic_updates_extensions\ExtensionUpdater;
+use Drupal\automatic_updates_extensions\ExtensionUpdateStage;
 use Drupal\Core\Batch\BatchBuilder;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Form\FormStateInterface;
@@ -28,68 +31,21 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * Defines a form to commit staged updates.
  *
  * @internal
- *   Form classes are internal.
+ *   Form classes are internal and should not be used by external code.
  */
 final class UpdateReady extends UpdateFormBase {
 
-  /**
-   * The updater service.
-   *
-   * @var \Drupal\automatic_updates_extensions\ExtensionUpdater
-   */
-  protected $updater;
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
-
-  /**
-   * The module list service.
-   *
-   * @var \Drupal\Core\Extension\ModuleExtensionList
-   */
-  protected $moduleList;
-
-  /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  protected $renderer;
-
-  /**
-   * The event dispatcher.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  protected $eventDispatcher;
-
-  /**
-   * Constructs a new UpdateReady object.
-   *
-   * @param \Drupal\automatic_updates_extensions\ExtensionUpdater $updater
-   *   The updater service.
-   * @param \Drupal\Core\Messenger\MessengerInterface $messenger
-   *   The messenger service.
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
-   * @param \Drupal\Core\Extension\ModuleExtensionList $module_list
-   *   The module list service.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
-   *   Event dispatcher service.
-   */
-  public function __construct(ExtensionUpdater $updater, MessengerInterface $messenger, StateInterface $state, ModuleExtensionList $module_list, RendererInterface $renderer, EventDispatcherInterface $event_dispatcher) {
-    $this->updater = $updater;
+  public function __construct(
+    private readonly ExtensionUpdateStage $stage,
+    MessengerInterface $messenger,
+    private readonly StateInterface $state,
+    private readonly ModuleExtensionList $moduleList,
+    private readonly RendererInterface $renderer,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly ComposerInspector $composerInspector,
+    private readonly PathLocator $pathLocator,
+  ) {
     $this->setMessenger($messenger);
-    $this->state = $state;
-    $this->moduleList = $module_list;
-    $this->renderer = $renderer;
-    $this->eventDispatcher = $event_dispatcher;
   }
 
   /**
@@ -104,27 +60,29 @@ final class UpdateReady extends UpdateFormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('automatic_updates_extensions.updater'),
+      $container->get(ExtensionUpdateStage::class),
       $container->get('messenger'),
       $container->get('state'),
       $container->get('extension.list.module'),
       $container->get('renderer'),
-      $container->get('event_dispatcher')
+      $container->get('event_dispatcher'),
+      $container->get(ComposerInspector::class),
+      $container->get(PathLocator::class),
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state, string $stage_id = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, ?string $stage_id = NULL) {
     try {
-      $this->updater->claim($stage_id);
+      $this->stage->claim($stage_id);
     }
-    catch (StageOwnershipException $e) {
+    catch (StageOwnershipException) {
       $this->messenger()->addError($this->t('Cannot continue the update because another Composer operation is currently in progress.'));
       return $form;
     }
-    catch (ApplyFailedException $e) {
+    catch (StageFailureMarkerException $e) {
       $this->messenger()->addError($e->getMessage());
       return $form;
     }
@@ -156,7 +114,11 @@ final class UpdateReady extends UpdateFormBase {
     $form['package_updates'] = $this->showUpdates();
     $form['backup'] = [
       '#prefix' => '<strong>',
-      '#markup' => $this->t('Back up your database and site before you continue. <a href=":backup_url">Learn how</a>.', [':backup_url' => 'https://www.drupal.org/node/22281']),
+      '#type' => 'checkbox',
+      '#title' => $this->t('Warning: Updating contributed modules or themes may leave your site inoperable or looking wrong.'),
+      '#description' => $this->t('Back up your database and site before you continue. <a href=":backup_url">Learn how</a>. Each contributed module or theme may follow different standards for backwards compatibility, may or may not have tests, and may add or remove features in any release. For these reasons, it is highly recommended that you test this update in a development environment first.', [':backup_url' => 'https://www.drupal.org/node/22281']),
+      '#required' => TRUE,
+      '#default_value' => FALSE,
       '#suffix' => '</strong>',
     ];
     $form['maintenance_mode'] = [
@@ -167,7 +129,7 @@ final class UpdateReady extends UpdateFormBase {
 
     // Don't run the status checks once the form has been submitted.
     if (!$form_state->getUserInput()) {
-      $results = $this->runStatusCheck($this->updater, $this->eventDispatcher);
+      $results = $this->runStatusCheck($this->stage, $this->eventDispatcher);
       // This will have no effect if $results is empty.
       $this->displayResults($results, $this->renderer);
       // If any errors occurred, return the form early so the user cannot
@@ -214,7 +176,7 @@ final class UpdateReady extends UpdateFormBase {
    */
   public function cancel(array &$form, FormStateInterface $form_state): void {
     try {
-      $this->updater->destroy();
+      $this->stage->destroy();
       $this->messenger()->addStatus($this->t('The update was successfully cancelled.'));
       $form_state->setRedirect('automatic_updates_extensions.report_update');
     }
@@ -231,17 +193,16 @@ final class UpdateReady extends UpdateFormBase {
    */
   private function showUpdates(): array {
     // Get packages that were updated in the stage directory.
-    $active = $this->updater->getActiveComposer();
-    $staged = $this->updater->getStageComposer();
-    $updated_packages = $staged->getPackagesWithDifferentVersionsIn($active);
+    $installed_packages = $this->composerInspector->getInstalledPackagesList($this->pathLocator->getProjectRoot());
+    $staged_packages = $this->composerInspector->getInstalledPackagesList($this->stage->getStageDirectory());
+    $updated_packages = $staged_packages->getPackagesWithDifferentVersionsIn($installed_packages);
 
     // Build a list of package names that were updated by user request.
     $updated_by_request = [];
-    foreach ($this->updater->getPackageVersions() as $group) {
+    foreach ($this->stage->getPackageVersions() as $group) {
       $updated_by_request = array_merge($updated_by_request, array_keys($group));
     }
 
-    $installed_packages = $active->getInstalledPackages();
     $updated_by_request_info = [];
     $updated_project_info = [];
     $supported_package_types = ['drupal-module', 'drupal-theme'];
@@ -250,17 +211,17 @@ final class UpdateReady extends UpdateFormBase {
     // updated.
     foreach ($updated_packages as $name => $updated_package) {
       // Ignore anything that isn't a module or a theme.
-      if (!in_array($updated_package->getType(), $supported_package_types, TRUE)) {
+      if (!in_array($updated_package->type, $supported_package_types, TRUE)) {
         continue;
       }
       $updated_project_info[$name] = [
-        'title' => $this->getProjectTitle($updated_package->getName()),
-        'installed_version' => $installed_packages[$name]->getPrettyVersion(),
-        'updated_version' => $updated_package->getPrettyVersion(),
+        'title' => $this->getProjectTitleFromPackage($updated_package),
+        'installed_version' => $installed_packages[$updated_package->name]->version,
+        'updated_version' => $updated_package->version,
       ];
     }
 
-    foreach (array_keys($updated_packages) as $name) {
+    foreach ($updated_packages as $name => $updated_package) {
       // Sort the updated packages into two groups: the ones that were updated
       // at the request of the user, and the ones that got updated anyway
       // (probably due to Composer's dependency resolution).
@@ -286,21 +247,25 @@ final class UpdateReady extends UpdateFormBase {
   /**
    * Gets the human-readable project title for a Composer package.
    *
-   * @param string $package_name
-   *   Package name.
+   * @param \Drupal\package_manager\InstalledPackage $package
+   *   The installed package.
    *
    * @return string
-   *   The human-readable title of the project.
+   *   The human-readable title of the project. If no project information is
+   *   available, the package name is returned.
    */
-  private function getProjectTitle(string $package_name): string {
-    $project_name = str_replace('drupal/', '', $package_name);
+  private function getProjectTitleFromPackage(InstalledPackage $package): string {
+    $project_name = $package->getProjectName();
+    if (!$project_name) {
+      return $package->name;
+    }
     $project_info = new ProjectInfo($project_name);
     $project_data = $project_info->getProjectInfo();
     if ($project_data) {
       return $project_data['title'];
     }
     else {
-      return $project_name;
+      return $package->name;
     }
   }
 

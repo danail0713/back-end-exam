@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -41,6 +41,7 @@ abstract class UpdaterFormTestBase extends AutomaticUpdatesFunctionalTestBase {
    * {@inheritdoc}
    */
   protected function setUp(): void {
+    static::$errorsExplanation = 'Your site cannot be automatically updated until further action is performed.';
     parent::setUp();
 
     $this->setReleaseMetadata(__DIR__ . '/../../../package_manager/tests/fixtures/release-history/drupal.9.8.1-security.xml');
@@ -51,12 +52,14 @@ abstract class UpdaterFormTestBase extends AutomaticUpdatesFunctionalTestBase {
       'access site in maintenance mode',
       'administer modules',
       'access site reports',
+      'view update notifications',
+      // CORE_MR_ONLY:'access help pages',
     ];
-    // Check for permission that was added in Drupal core 9.4.x.
-    $available_permissions = array_keys($this->container->get('user.permissions')->getPermissions());
-    if (in_array('view update notifications', $available_permissions, TRUE)) {
-      array_push($permissions, 'view update notifications');
+    // BEGIN: DELETE FROM CORE MERGE REQUEST
+    if (array_key_exists('access help pages', $this->container->get('user.permissions')->getPermissions())) {
+      $permissions[] = 'access help pages';
     }
+    // END: DELETE FROM CORE MERGE REQUEST
     $user = $this->createUser($permissions);
     $this->drupalLogin($user);
     $this->checkForUpdates();
@@ -85,7 +88,7 @@ abstract class UpdaterFormTestBase extends AutomaticUpdatesFunctionalTestBase {
     $this->drupalGet('/admin/reports/status');
     $this->clickLink('Rerun readiness checks');
     $this->drupalGet('/admin');
-    $this->assertSession()->pageTextContains($message);
+    $this->assertSession()->pageTextContains($message->render());
     // Clear the results so the only way the message could appear on the pages
     // used for the update process is if they show the cached results.
     TestSubscriber1::setTestResult(NULL, StatusCheckEvent::class);
@@ -137,10 +140,10 @@ abstract class UpdaterFormTestBase extends AutomaticUpdatesFunctionalTestBase {
    */
   protected function assertStatusMessageContainsResult(ValidationResult $result): void {
     $assert_session = $this->assertSession();
-    $type = $result->getSeverity() === SystemManager::REQUIREMENT_ERROR ? 'error' : 'warning';
-    $assert_session->statusMessageContains((string) $result->getSummary(), $type);
-    $assert_session->pageTextContainsOnce((string) $result->getSummary());
-    foreach ($result->getMessages() as $message) {
+    $type = $result->severity === SystemManager::REQUIREMENT_ERROR ? 'error' : 'warning';
+    $assert_session->statusMessageContains((string) $result->summary, $type);
+    $assert_session->pageTextContainsOnce((string) $result->summary);
+    foreach ($result->messages as $message) {
       $assert_session->statusMessageContains((string) $message, $type);
       $assert_session->pageTextContainsOnce((string) $message);
     }

@@ -1,15 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
-use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\package_manager\Event\PreApplyEvent;
-use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\Event\PreOperationStageEvent;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\package_manager\Event\StatusCheckEvent;
 use Drupal\package_manager\PathLocator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -23,47 +20,38 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  */
 class WritableFileSystemValidator implements EventSubscriberInterface {
 
+  use BaseRequirementValidatorTrait;
   use StringTranslationTrait;
 
-  /**
-   * The path locator service.
-   *
-   * @var \Drupal\package_manager\PathLocator
-   */
-  protected $pathLocator;
-
-  /**
-   * Constructs a WritableFileSystemValidator object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The translation service.
-   */
-  public function __construct(PathLocator $path_locator, TranslationInterface $translation) {
-    $this->pathLocator = $path_locator;
-    $this->setStringTranslation($translation);
+  public function __construct(private readonly PathLocator $pathLocator) {
   }
 
   /**
-   * {@inheritdoc}
+   * Checks that the file system is writable.
    *
-   * @todo It might make sense to use a more sophisticated method of testing
-   *   writability than is_writable(), since it's not clear if that can return
-   *   false negatives/positives due to things like SELinux, exotic file
-   *   systems, and so forth.
+   * @todo Determine if 'is_writable()' is a sufficiently robust test across
+   *   different operating systems in https://drupal.org/i/3348253.
    */
-  public function validateStagePreOperation(PreOperationStageEvent $event): void {
+  public function validate(PreOperationStageEvent $event): void {
     $messages = [];
 
-    $drupal_root = $this->pathLocator->getProjectRoot();
+    $project_root = $this->pathLocator->getProjectRoot();
+
+    // If the web (Drupal) root and project root are different, validate the
+    // web root separately.
     $web_root = $this->pathLocator->getWebRoot();
     if ($web_root) {
-      $drupal_root .= DIRECTORY_SEPARATOR . $web_root;
+      $drupal_root = $project_root . DIRECTORY_SEPARATOR . $web_root;
+      if (!is_writable($drupal_root)) {
+        $messages[] = $this->t('The Drupal directory "@dir" is not writable.', [
+          '@dir' => $drupal_root,
+        ]);
+      }
     }
-    if (!is_writable($drupal_root)) {
-      $messages[] = $this->t('The Drupal directory "@dir" is not writable.', [
-        '@dir' => $drupal_root,
+
+    if (!is_writable($project_root)) {
+      $messages[] = $this->t('The project root directory "@dir" is not writable.', [
+        '@dir' => $project_root,
       ]);
     }
 
@@ -99,17 +87,6 @@ class WritableFileSystemValidator implements EventSubscriberInterface {
     if ($messages) {
       $event->addError($messages, $this->t('The file system is not writable.'));
     }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function getSubscribedEvents(): array {
-    return [
-      PreCreateEvent::class => 'validateStagePreOperation',
-      PreApplyEvent::class => 'validateStagePreOperation',
-      StatusCheckEvent::class => 'validateStagePreOperation',
-    ];
   }
 
 }

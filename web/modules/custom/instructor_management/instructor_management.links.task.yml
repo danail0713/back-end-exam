@@ -1,0 +1,12 @@
+instructor_management.login_instructor:
+  title: Log in as an instructor
+  route_name: instructor_management.log_in_instructor
+  base_route: user.page
+instructor_management.add_resources:
+  title: Add resources
+  route_name: instructor_management.add_resources
+  base_route: instructor_management.add_resources
+instructor_management.add_homework:
+  title: Add homework
+  route_name: instructor_management.add_homework
+  base_route: instructor_management.add_resources

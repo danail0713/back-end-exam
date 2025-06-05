@@ -1,16 +1,16 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Form;
 
 use Drupal\automatic_updates\BatchProcessor;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\package_manager\Exception\StageFailureMarkerException;
 use Drupal\package_manager\FailureMarker;
 use Drupal\package_manager\ProjectInfo;
 use Drupal\automatic_updates\ReleaseChooser;
-use Drupal\automatic_updates\Updater;
-use Drupal\package_manager\Exception\ApplyFailedException;
+use Drupal\automatic_updates\UpdateStage;
 use Drupal\update\ProjectRelease;
 use Drupal\Core\Batch\BatchBuilder;
 use Drupal\Core\Extension\ExtensionVersion;
@@ -36,82 +36,15 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 final class UpdaterForm extends UpdateFormBase {
 
-  /**
-   * The updater service.
-   *
-   * @var \Drupal\automatic_updates\Updater
-   */
-  protected $updater;
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
-
-  /**
-   * The event dispatcher service.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  protected $eventDispatcher;
-
-  /**
-   * The release chooser service.
-   *
-   * @var \Drupal\automatic_updates\ReleaseChooser
-   */
-  protected $releaseChooser;
-
-  /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  protected $renderer;
-
-  /**
-   * Failure marker service.
-   *
-   * @var \Drupal\package_manager\FailureMarker
-   */
-  protected $failureMarker;
-
-  /**
-   * The module handler service.
-   *
-   * @var \Drupal\Core\Extension\ModuleHandlerInterface
-   */
-  protected $moduleHandler;
-
-  /**
-   * Constructs a new UpdaterForm object.
-   *
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
-   * @param \Drupal\automatic_updates\Updater $updater
-   *   The updater service.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
-   *   The event dispatcher service.
-   * @param \Drupal\automatic_updates\ReleaseChooser $release_chooser
-   *   The release chooser service.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   * @param \Drupal\package_manager\FailureMarker $failure_marker
-   *   The failure marker service.
-   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
-   *   The module handler service.
-   */
-  public function __construct(StateInterface $state, Updater $updater, EventDispatcherInterface $event_dispatcher, ReleaseChooser $release_chooser, RendererInterface $renderer, FailureMarker $failure_marker, ModuleHandlerInterface $module_handler) {
-    $this->updater = $updater;
-    $this->state = $state;
-    $this->eventDispatcher = $event_dispatcher;
-    $this->releaseChooser = $release_chooser;
-    $this->renderer = $renderer;
-    $this->failureMarker = $failure_marker;
-    $this->moduleHandler = $module_handler;
-  }
+  public function __construct(
+    private readonly StateInterface $state,
+    private readonly UpdateStage $stage,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly ReleaseChooser $releaseChooser,
+    private readonly RendererInterface $renderer,
+    private readonly FailureMarker $failureMarker,
+    private readonly ModuleHandlerInterface $moduleHandler,
+  ) {}
 
   /**
    * {@inheritdoc}
@@ -126,11 +59,11 @@ final class UpdaterForm extends UpdateFormBase {
   public static function create(ContainerInterface $container) {
     return new static(
       $container->get('state'),
-      $container->get('automatic_updates.updater'),
+      $container->get(UpdateStage::class),
       $container->get('event_dispatcher'),
-      $container->get('automatic_updates.release_chooser'),
+      $container->get(ReleaseChooser::class),
       $container->get('renderer'),
-      $container->get('package_manager.failure_marker'),
+      $container->get(FailureMarker::class),
       $container->get('module_handler')
     );
   }
@@ -142,11 +75,11 @@ final class UpdaterForm extends UpdateFormBase {
     try {
       $this->failureMarker->assertNotExists();
     }
-    catch (ApplyFailedException $e) {
+    catch (StageFailureMarkerException $e) {
       $this->messenger()->addError($e->getMessage());
       return $form;
     }
-    if ($this->updater->isAvailable()) {
+    if ($this->stage->isAvailable()) {
       $stage_exists = FALSE;
     }
     else {
@@ -158,12 +91,12 @@ final class UpdaterForm extends UpdateFormBase {
       $stage_id = $this->getRequest()->getSession()->get(BatchProcessor::STAGE_ID_SESSION_KEY);
       if ($stage_id) {
         try {
-          $this->updater->claim($stage_id);
+          $this->stage->claim($stage_id);
           return $this->redirect('automatic_updates.confirmation_page', [
             'stage_id' => $stage_id,
           ]);
         }
-        catch (StageOwnershipException $e) {
+        catch (StageOwnershipException) {
           // We already know a stage exists, even if it's not ours, so we don't
           // have to do anything else here.
         }
@@ -183,7 +116,7 @@ final class UpdaterForm extends UpdateFormBase {
       foreach ($support_branches as $support_branch) {
         $support_branch_extension_version = ExtensionVersion::createFromSupportBranch($support_branch);
         if ($support_branch_extension_version->getMajorVersion() === $installed_version->getMajorVersion() && $support_branch_extension_version->getMinorVersion() >= $installed_version->getMinorVersion()) {
-          $recent_release_in_minor = $this->releaseChooser->getMostRecentReleaseInMinor($this->updater, $support_branch . '0');
+          $recent_release_in_minor = $this->releaseChooser->getMostRecentReleaseInMinor($this->stage, $support_branch . '0');
           if ($recent_release_in_minor) {
             $releases[$support_branch] = $recent_release_in_minor;
           }
@@ -201,7 +134,13 @@ final class UpdaterForm extends UpdateFormBase {
       $results = [];
     }
     else {
-      $results = $this->runStatusCheck($this->updater, $this->eventDispatcher, TRUE);
+      try {
+        $results = $this->runStatusCheck($this->stage, $this->eventDispatcher);
+      }
+      catch (\Throwable $e) {
+        $this->messenger()->addError($e->getMessage());
+        return $form;
+      }
     }
     $this->displayResults($results, $this->renderer);
     $project = $project_info->getProjectInfo();
@@ -372,7 +311,7 @@ final class UpdaterForm extends UpdateFormBase {
    */
   public function deleteExistingUpdate(): void {
     try {
-      $this->updater->destroy(TRUE);
+      $this->stage->destroy(TRUE);
       $this->messenger()->addMessage($this->t("Staged update deleted"));
     }
     catch (StageException $e) {
@@ -444,8 +383,6 @@ final class UpdaterForm extends UpdateFormBase {
       ],
       'target_version' => [
         'data' => [
-          // @todo Is an inline template the right tool here? Is there an Update
-          // module template we should use instead?
           '#type' => 'inline_template',
           '#template' => '{{ release_version }} (<a href="{{ release_link }}" title="{{ project_title }}">{{ release_notes }}</a>)',
           '#context' => [
@@ -490,25 +427,14 @@ final class UpdaterForm extends UpdateFormBase {
    *   The human-readable status.
    */
   private function getUpdateStatus(int $status): TranslatableMarkup {
-    switch ($status) {
-      case UpdateManagerInterface::NOT_SECURE:
-        return $this->t('Security update required!');
-
-      case UpdateManagerInterface::REVOKED:
-        return $this->t('Revoked!');
-
-      case UpdateManagerInterface::NOT_SUPPORTED:
-        return $this->t('Not supported!');
-
-      case UpdateManagerInterface::NOT_CURRENT:
-        return $this->t('Update available');
-
-      case UpdateManagerInterface::CURRENT:
-        return $this->t('Up to date');
-
-      default:
-        return $this->t('Unknown status');
-    }
+    return match ($status) {
+      UpdateManagerInterface::NOT_SECURE => $this->t('Security update required!'),
+      UpdateManagerInterface::REVOKED => $this->t('Revoked!'),
+      UpdateManagerInterface::NOT_SUPPORTED => $this->t('Not supported!'),
+      UpdateManagerInterface::NOT_CURRENT => $this->t('Update available'),
+      UpdateManagerInterface::CURRENT => $this->t('Up to date'),
+      default => $this->t('Unknown status'),
+    };
   }
 
 }

@@ -74,11 +74,12 @@ class RegisterStudentForm extends FormBase {
     $phone = $form_state->getValue('phone');
     // Check if email or phone already exist
     $existing_user_email = user_load_by_mail($email);
+    $existing_username = user_load_by_name($username);
     $existing_profile = \Drupal::entityTypeManager()
       ->getStorage('profile')
-      ->loadByProperties(['field_phone' => $phone]);
+      ->loadByProperties(['field_phone' => $phone, 'type' => 'student']);
     // Validate username uniqueness
-    if (user_load_by_name($username)) {
+    if ($existing_username) {
       $form_state->setErrorByName('username', $this->t('This username is already taken.'));
     }
     if ($existing_user_email || !empty($existing_profile)) {

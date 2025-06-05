@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates_extensions\Build;
 
@@ -14,7 +14,7 @@ use Symfony\Component\Filesystem\Filesystem as SymfonyFilesystem;
  * @group automatic_updates_extensions
  * @internal
  */
-class ModuleUpdateTest extends UpdateTestBase {
+final class ModuleUpdateTest extends UpdateTestBase {
 
   use FormTestTrait;
 
@@ -24,7 +24,7 @@ class ModuleUpdateTest extends UpdateTestBase {
   protected function createTestProject(string $template): void {
     parent::createTestProject($template);
     $this->setReleaseMetadata([
-      'drupal' => __DIR__ . '/../../../../package_manager/tests/fixtures/release-history/drupal.9.8.1-security.xml',
+      'drupal' => __DIR__ . '/../../../../package_manager/tests/fixtures/release-history/drupal.9.8.2.xml',
       'alpha'  => __DIR__ . '/../../fixtures/release-history/alpha.1.1.0.xml',
       'new_module' => __DIR__ . '/../../fixtures/release-history/new_module.1.1.0.xml',
     ]);
@@ -40,8 +40,9 @@ class ModuleUpdateTest extends UpdateTestBase {
 \$config['update_test.settings']['system_info'] = $system_info;
 END;
     $this->writeSettings($code);
-    $this->addRepository('alpha', $this->copyFixtureToTempDirectory(__DIR__ . '/../../../../package_manager/tests/fixtures/build_test_projects/alpha/1.0.0'));
-    $this->runComposer('COMPOSER_MIRROR_PATH_REPOS=1 composer require drupal/alpha --update-with-all-dependencies', 'project');
+    $alpha_repo_path = $this->copyFixtureToTempDirectory(__DIR__ . '/../../../../package_manager/tests/fixtures/build_test_projects/alpha/1.0.0');
+    $this->addRepository('alpha', $alpha_repo_path);
+    $this->runComposer('composer require drupal/alpha --update-with-all-dependencies', 'project');
     $this->assertModuleVersion('alpha', '1.0.0');
     $fs = new SymfonyFilesystem();
     $fs->mirror($this->copyFixtureToTempDirectory(__DIR__ . '/../../fixtures/new_module'), $this->getWorkspaceDirectory() . '/project/web/modules');
@@ -51,8 +52,13 @@ END;
       'new_module',
     ]);
 
-    // Change both modules' upstream version.
-    $this->addRepository('alpha', $this->copyFixtureToTempDirectory(__DIR__ . '/../../../../package_manager/tests/fixtures/build_test_projects/alpha/1.1.0'));
+    // Change the module's upstream version.
+    static::copyFixtureFilesTo(__DIR__ . '/../../../../package_manager/tests/fixtures/build_test_projects/alpha/1.1.0', $alpha_repo_path);
+
+    // Ensure that none of the above changes have caused any status check or
+    // other errors on the status report.
+    $this->checkForUpdates();
+    $this->assertStatusReportChecksSuccessful();
   }
 
   /**
@@ -75,24 +81,24 @@ END;
     $this->assertStringContainsString('The project new_module is not a Drupal project known to Composer and cannot be updated.', $page_text);
     $this->assertStringContainsString('new_module', $page_text);
     // Use the API endpoint to create a stage and update the 'alpha' module to
-    // 1.1.0. We ask the API to return the contents of the module's
-    // composer.json file, so we can assert that they were updated to the
-    // version we expect.
-    // @see \Drupal\automatic_updates_extensions_test_api\ApiController::run()
-    $file_contents = $this->getPackageManagerTestApiResponse(
+    // 1.1.0.
+    $this->makePackageManagerTestApiRequest(
       '/automatic-updates-extensions-test-api',
       [
         'projects' => [
           'alpha' => '1.1.0',
         ],
-        'files_to_return' => [
-          'web/modules/contrib/alpha/composer.json',
-        ],
       ]
     );
 
-    $module_composer_json = json_decode($file_contents['web/modules/contrib/alpha/composer.json']);
-    $this->assertSame('1.1.0', $module_composer_json->version);
+    $updated_composer_json = $this->getWebRoot() . 'modules/contrib/alpha/composer.json';
+    // Assert the module was updated.
+    $this->assertFileEquals(
+      __DIR__ . '/../../../../package_manager/tests/fixtures/build_test_projects/alpha/1.1.0/composer.json',
+      $updated_composer_json,
+    );
+    $this->assertRequestedChangesWereLogged(['Update drupal/alpha from 1.0.0 to 1.1.0']);
+    $this->assertAppliedChangesWereLogged(['Updated drupal/alpha from 1.0.0 to 1.1.0']);
   }
 
   /**
@@ -126,10 +132,24 @@ END;
     $page->pressButton('Update');
     $this->waitForBatchJob();
     $assert_session->pageTextContains('Ready to update');
+    $page->checkField('backup');
     $page->pressButton('Continue');
     $this->waitForBatchJob();
     $assert_session->pageTextContains('Update complete!');
     $this->assertModuleVersion('alpha', '1.1.0');
+    $this->assertRequestedChangesWereLogged(['Update drupal/alpha from 1.0.0 to 1.1.0']);
+    $this->assertAppliedChangesWereLogged(['Updated drupal/alpha from 1.0.0 to 1.1.0']);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function copyCodebase(?\Iterator $iterator = NULL, $working_dir = NULL): void {
+    parent::copyCodebase($iterator, $working_dir);
+
+    // Ensure that we will install Drupal 9.8.0 (a fake version that should
+    // never exist in real life) initially.
+    $this->setUpstreamCoreVersion('9.8.0');
   }
 
   /**

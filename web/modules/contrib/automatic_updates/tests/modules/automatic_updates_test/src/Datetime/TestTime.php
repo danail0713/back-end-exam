@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates_test\Datetime;
 
@@ -20,7 +20,7 @@ class TestTime extends Time {
   protected $decoratorTime;
 
   /**
-   * Constructs an Updater object.
+   * Constructs a TestTime object.
    *
    * @param \Drupal\Component\Datetime\Time $time
    *   The time service.

@@ -1,11 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
 use Drupal\package_manager\Event\PreCreateEvent;
-use Drupal\package_manager\Exception\StageValidationException;
+use Drupal\package_manager\Exception\StageEventException;
 use Drupal\package_manager\ValidationResult;
 
 /**
@@ -75,14 +75,14 @@ class PendingUpdatesValidatorTest extends PackageManagerKernelTestBase {
     // will think it's pending.
     require_once __DIR__ . '/../../fixtures/post_update.php';
     $result = ValidationResult::createError([
-      'Some modules have database schema updates to install. You should run the <a href="/update.php">database update script</a> immediately.',
+      t('Some modules have database schema updates to install. You should run the <a href="/update.php">database update script</a> immediately.'),
     ]);
     try {
       $stage->apply();
       $this->fail('Able to apply update even though there is pending update.');
     }
-    catch (StageValidationException $exception) {
-      $this->assertValidationResultsEqual([$result], $exception->getResults());
+    catch (StageEventException $exception) {
+      $this->assertExpectedResultsFromException([$result], $exception);
     }
   }
 

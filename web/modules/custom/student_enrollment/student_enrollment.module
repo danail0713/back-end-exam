@@ -3,6 +3,8 @@
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url as CoreUrl;
+use Drupal\file\FileInterface;
+use MongoDB\Client;
 
 /**
  * Implements hook_schema().
@@ -27,7 +29,7 @@ function student_enrollment_schema() {
         'description' => 'The time when the enrollment was created.',
       ],
     ],
-    'primary key' => ['user_id','course_id'],
+    'primary key' => ['user_id', 'course_id'],
     'indexes' => [
       'created' => ['created'],
     ],
@@ -77,3 +79,65 @@ function student_enrollment_theme() {
   ];
 }
 
+/**
+ * Implements hook_file_download().
+ */
+function student_enrollment_file_download($uri) {
+  // Only apply to files in private://resources
+  if (str_contains($uri, 'private://resources/') == false) {
+    return -1;
+  }
+
+  // Load the file entity.
+  $file_entities = \Drupal::entityTypeManager()->getStorage('file')->loadByProperties(['uri' => $uri]);
+  $file = reset($file_entities);
+  if ($file instanceof FileInterface) {
+    $mongo_client = new Client('mongodb://localhost:27017');
+    $db = $mongo_client->getDatabase('test');
+    $themes = $db->getCollection('themes');
+    $file_url = $file->createFileUrl();
+    $theme = $themes->findOne([
+      'resources' => [
+        '$in' => [$file_url]
+      ],
+    ]);
+    $course_id = $theme['course_id'];
+    $themes_array = $themes->find(['course_id' => $course_id])->toArray();
+    $theme_index = array_search($theme, $themes_array);
+    if ($theme_index > 0) {
+      $previous_theme = $themes_array[$theme_index - 1];
+      $previous_theme_id = $previous_theme['_id'];
+    }
+    if (isUserEnrolled((int)$course_id) && $theme_index === 0) {
+      $headers = [
+        'Content-Type' => $file->getMimeType(),
+      ];
+      // For MP4 files, stream in browser.
+      if ($file->getMimeType() != 'video/mp4' && $file->getMimeType() != 'video/avi' && $file->getMimeType() != 'video/mov') {
+        $headers['Content-Disposition'] = 'attachment; filename="' . $file->getFilename() . '"';
+      }
+      return $headers;
+    }
+  }
+  return -1;
+}
+
+
+function isUserEnrolled($course_id) {
+  // Implement logic to check if the user is already enrolled for the course.
+  $current_user_id = \Drupal::currentUser()->id();
+  $query = \Drupal::database()->select('student_enrollments', 'e');
+  $query->fields('e');
+  $query->condition('user_id', $current_user_id);
+  $query->condition('course_id', $course_id);
+  $result = $query->execute();
+  return !empty($result->fetchAssoc());
+}
+
+function isUserHasHomework($theme_id) {
+  $mongo_client = new Client('mongodb://localhost:27017');
+  $db = $mongo_client->getDatabase('test');
+  $homework_responses = $db->getCollection('homeworks_responses');
+  $current_user_id = (string)\Drupal::currentUser()->id();
+  
+}

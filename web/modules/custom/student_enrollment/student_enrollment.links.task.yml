@@ -6,4 +6,7 @@ student_enrollment.enrollments:
   route_name: student_enrollment.enrollments
   base_route: system.admin_content
   title: 'Student enrollments'
-
+student_enrollment.login_student:
+  route_name: student_enrollment.log_in_student
+  base_route: user.page
+  title: 'Log in as a student'

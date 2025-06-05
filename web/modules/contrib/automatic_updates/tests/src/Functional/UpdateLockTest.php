@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -42,7 +42,7 @@ class UpdateLockTest extends AutomaticUpdatesFunctionalTestBase {
    * Tests that only user who started an update can continue through it.
    */
   public function testLock(): void {
-    $this->getStageFixtureManipulator()->setCorePackageVersion('9.8.1');
+    $this->getStageFixtureManipulator()->setCorePackageVersion('9.8.2');
     $page = $this->getSession()->getPage();
     $assert_session = $this->assertSession();
     $this->mockActiveCoreVersion('9.8.0');
@@ -56,7 +56,7 @@ class UpdateLockTest extends AutomaticUpdatesFunctionalTestBase {
     $this->drupalGet('/admin/modules/update');
     $page->pressButton('Update');
     $this->checkForMetaRefresh();
-    $this->assertUpdateReady('9.8.1');
+    $this->assertUpdateReady('9.8.2');
     $assert_session->buttonExists('Continue');
     $url = $this->getSession()->getCurrentUrl();
 

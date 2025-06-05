@@ -1,13 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
-use PhpTuf\ComposerStager\Infrastructure\Service\Finder\ExecutableFinder as StagerExecutableFinder;
-use PhpTuf\ComposerStager\Infrastructure\Service\Finder\ExecutableFinderInterface;
-use Symfony\Component\Process\ExecutableFinder as SymfonyExecutableFinder;
+use PhpTuf\ComposerStager\API\Finder\Service\ExecutableFinderInterface;
 
 /**
  * An executable finder which looks for executable paths in configuration.
@@ -19,32 +17,10 @@ use Symfony\Component\Process\ExecutableFinder as SymfonyExecutableFinder;
  */
 final class ExecutableFinder implements ExecutableFinderInterface {
 
-  /**
-   * The decorated executable finder.
-   *
-   * @var \PhpTuf\ComposerStager\Infrastructure\Service\Finder\ExecutableFinder
-   */
-  private $decorated;
-
-  /**
-   * The config factory service.
-   *
-   * @var \Drupal\Core\Config\ConfigFactoryInterface
-   */
-  private $configFactory;
-
-  /**
-   * Constructs an ExecutableFinder object.
-   *
-   * @param \Symfony\Component\Process\ExecutableFinder $symfony_executable_finder
-   *   The Symfony executable finder.
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
-   *   The config factory service.
-   */
-  public function __construct(SymfonyExecutableFinder $symfony_executable_finder, ConfigFactoryInterface $config_factory) {
-    $this->decorated = new StagerExecutableFinder($symfony_executable_finder);
-    $this->configFactory = $config_factory;
-  }
+  public function __construct(
+    private readonly ExecutableFinderInterface $decorated,
+    private readonly ConfigFactoryInterface $configFactory,
+  ) {}
 
   /**
    * {@inheritdoc}

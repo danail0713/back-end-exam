@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
@@ -24,32 +24,10 @@ final class ComposerMinimumStabilityValidator implements EventSubscriberInterfac
 
   use StringTranslationTrait;
 
-  /**
-   * The path locator service.
-   *
-   * @var \Drupal\package_manager\PathLocator
-   */
-  protected PathLocator $pathLocator;
-
-  /**
-   * The Composer inspector service.
-   *
-   * @var \Drupal\package_manager\ComposerInspector
-   */
-  protected ComposerInspector $inspector;
-
-  /**
-   * Constructs a ComposerMinimumStabilityValidator object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   * @param \Drupal\package_manager\ComposerInspector $inspector
-   *   The Composer inspector service.
-   */
-  public function __construct(PathLocator $path_locator, ComposerInspector $inspector) {
-    $this->pathLocator = $path_locator;
-    $this->inspector = $inspector;
-  }
+  public function __construct(
+    private readonly PathLocator $pathLocator,
+    private readonly ComposerInspector $inspector,
+  ) {}
 
   /**
    * Validates composer minimum stability.
@@ -57,10 +35,10 @@ final class ComposerMinimumStabilityValidator implements EventSubscriberInterfac
    * @param \Drupal\package_manager\Event\PreRequireEvent $event
    *   The stage event.
    */
-  public function validateMinimumStability(PreRequireEvent $event): void {
+  public function validate(PreRequireEvent $event): void {
     $dir = $this->pathLocator->getProjectRoot();
     $minimum_stability = $this->inspector->getConfig('minimum-stability', $dir);
-    $requested_packages = $event->getRuntimePackages();
+    $requested_packages = array_merge($event->getDevPackages(), $event->getRuntimePackages());
 
     foreach ($requested_packages as $package_name => $version) {
       // In the root composer.json, a stability flag can also be specified. They
@@ -97,7 +75,7 @@ final class ComposerMinimumStabilityValidator implements EventSubscriberInterfac
    */
   public static function getSubscribedEvents(): array {
     return [
-      PreRequireEvent::class => 'validateMinimumStability',
+      PreRequireEvent::class => 'validate',
     ];
   }
 

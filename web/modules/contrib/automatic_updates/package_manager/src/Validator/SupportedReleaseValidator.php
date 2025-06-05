@@ -1,10 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
-use Drupal\Component\Render\FormattableMarkup;
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ProjectInfo;
 use Drupal\package_manager\LegacyVersionUtility;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
@@ -21,6 +22,11 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 final class SupportedReleaseValidator implements EventSubscriberInterface {
 
   use StringTranslationTrait;
+
+  public function __construct(
+    private readonly ComposerInspector $composerInspector,
+    private readonly PathLocator $pathLocator,
+  ) {}
 
   /**
    * Checks if the given version of a project is supported.
@@ -39,7 +45,7 @@ final class SupportedReleaseValidator implements EventSubscriberInterface {
    *   TRUE if the given version of the project is supported, otherwise FALSE.
    *   given version is not supported will return FALSE.
    */
-  protected function isSupportedRelease(string $name, string $semantic_version): bool {
+  private function isSupportedRelease(string $name, string $semantic_version): bool {
     $supported_releases = (new ProjectInfo($name))->getInstallableReleases();
     if (!$supported_releases) {
       return FALSE;
@@ -68,30 +74,30 @@ final class SupportedReleaseValidator implements EventSubscriberInterface {
    * @param \Drupal\package_manager\Event\PreApplyEvent $event
    *   The event object.
    */
-  public function checkStagedReleases(PreApplyEvent $event): void {
-    $active = $event->getStage()->getActiveComposer();
-    $staged = $event->getStage()->getStageComposer();
+  public function validate(PreApplyEvent $event): void {
+    $active = $this->composerInspector->getInstalledPackagesList($this->pathLocator->getProjectRoot());
+    $staged = $this->composerInspector->getInstalledPackagesList($event->stage->getStageDirectory());
     $updated_packages = array_merge(
-      $staged->getPackagesNotIn($active),
-      $staged->getPackagesWithDifferentVersionsIn($active)
+      $staged->getPackagesNotIn($active)->getArrayCopy(),
+      $staged->getPackagesWithDifferentVersionsIn($active)->getArrayCopy()
     );
     $unknown_packages = [];
     $unsupported_packages = [];
     foreach ($updated_packages as $package_name => $staged_package) {
       // Only packages of the types 'drupal-module' or 'drupal-theme' that
       // start with 'drupal/' will have update XML from drupal.org.
-      if (!in_array($staged_package->getType(), ['drupal-module', 'drupal-theme'], TRUE)
+      if (!in_array($staged_package->type, ['drupal-module', 'drupal-theme'], TRUE)
          || !str_starts_with($package_name, 'drupal/')) {
         continue;
       }
-      $project_name = $staged->getProjectForPackage($package_name);
+      $project_name = $staged[$package_name]->getProjectName();
       if (empty($project_name)) {
         $unknown_packages[] = $package_name;
         continue;
       }
-      $semantic_version = $staged_package->getPrettyVersion();
+      $semantic_version = $staged_package->version;
       if (!$this->isSupportedRelease($project_name, $semantic_version)) {
-        $unsupported_packages[] = new FormattableMarkup('@project_name (@package_name) @version', [
+        $unsupported_packages[] = $this->t('@project_name (@package_name) @version', [
           '@project_name' => $project_name,
           '@package_name' => $package_name,
           '@version' => $semantic_version,
@@ -107,12 +113,16 @@ final class SupportedReleaseValidator implements EventSubscriberInterface {
       $event->addError($unsupported_packages, $summary);
     }
     if ($unknown_packages) {
-      $summary = $this->formatPlural(
-        count($unknown_packages),
-        'Cannot update because the following new or updated Drupal package does not have project information.',
-        'Cannot update because the following new or updated Drupal packages do not have project information.',
-      );
-      $event->addError($unknown_packages, $summary);
+      $event->addError([
+        $this->formatPlural(
+          count($unknown_packages),
+          'Cannot update because the following new or updated Drupal package does not have project information: @unknown_packages',
+          'Cannot update because the following new or updated Drupal packages do not have project information: @unknown_packages',
+          [
+            '@unknown_packages' => implode(', ', $unknown_packages),
+          ],
+        ),
+      ]);
     }
   }
 
@@ -121,7 +131,7 @@ final class SupportedReleaseValidator implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents(): array {
     return [
-      PreApplyEvent::class => 'checkStagedReleases',
+      PreApplyEvent::class => 'validate',
     ];
   }
 

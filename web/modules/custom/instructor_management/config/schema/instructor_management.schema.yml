@@ -1,0 +1,15 @@
+block.settings.instructor_management_courses_i_teach:
+  type: block_settings
+  label: 'Courses I teach block'
+  mapping:
+    example:
+      type: string
+      label: Example
+
+block.settings.instructor_management_add_resources:
+  type: block_settings
+  label: 'Add resources block'
+  mapping:
+    example:
+      type: string
+      label: Example

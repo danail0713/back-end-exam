@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
@@ -21,21 +21,7 @@ use Drupal\update\UpdateManagerInterface;
  */
 final class ProjectInfo {
 
-  /**
-   * The project name.
-   *
-   * @var string
-   */
-  protected $name;
-
-  /**
-   * Constructs a ProjectInfo object.
-   *
-   * @param string $name
-   *   The project name.
-   */
-  public function __construct(string $name) {
-    $this->name = $name;
+  public function __construct(private readonly string $name) {
   }
 
   /**
@@ -200,7 +186,7 @@ final class ProjectInfo {
     // update processor service.
     if (!isset($available_projects[$this->name])) {
       /** @var \Drupal\package_manager\PackageManagerUpdateProcessor $update_processor */
-      $update_processor = \Drupal::service('package_manager.update_processor');
+      $update_processor = \Drupal::service(PackageManagerUpdateProcessor::class);
       if ($project_data = $update_processor->getProjectData($this->name)) {
         $available_projects[$this->name] = $project_data;
       }

@@ -1,17 +1,18 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
-use Drupal\automatic_updates\CronUpdater;
-use Drupal\Core\Site\Settings;
+use Drupal\automatic_updates\CronUpdateRunner;
+use Drupal\automatic_updates\CommandExecutor;
+use Drupal\automatic_updates\UpdateStage;
 use Drupal\fixture_manipulator\StageFixtureManipulator;
+use Drupal\Tests\automatic_updates\Traits\TestSetUpTrait;
 use Drupal\Tests\BrowserTestBase;
 use Drupal\Tests\package_manager\Traits\AssertPreconditionsTrait;
+use Drupal\Tests\package_manager\Traits\ComposerStagerTestTrait;
 use Drupal\Tests\package_manager\Traits\FixtureManipulatorTrait;
-use Drupal\Tests\package_manager\Traits\FixtureUtilityTrait;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Base class for functional tests of the Automatic Updates module.
@@ -21,31 +22,16 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
 
   use AssertPreconditionsTrait;
+  use ComposerStagerTestTrait;
   use FixtureManipulatorTrait;
-  use FixtureUtilityTrait;
+  use TestSetUpTrait;
 
   /**
    * {@inheritdoc}
    */
   protected static $modules = [
     'automatic_updates',
-    'automatic_updates_test_disable_validators',
     'package_manager_bypass',
-  ];
-
-  /**
-   * The service IDs of any validators to disable.
-   *
-   * @var string[]
-   */
-  protected $disableValidators = [
-    // Disable the Composer executable validator, since it may cause the tests
-    // to fail if a supported version of Composer is unavailable to the web
-    // server. This should be okay in most situations because, apart from the
-    // validator, only Composer Stager needs run Composer, and
-    // package_manager_bypass is disabling those operations.
-    // @todo https://www.drupal.org/project/automatic_updates/issues/3320755.
-    'package_manager.validator.composer_executable',
   ];
 
   /**
@@ -53,26 +39,11 @@ abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
    */
   protected function setUp(): void {
     parent::setUp();
-    $this->disableValidators($this->disableValidators);
-    $this->useFixtureDirectoryAsActive(__DIR__ . '/../../../package_manager/tests/fixtures/fake_site');
     // @todo Remove in https://www.drupal.org/project/automatic_updates/issues/3284443
-    $this->config('automatic_updates.settings')->set('cron', CronUpdater::SECURITY)->save();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function installModulesFromClassProperty(ContainerInterface $container): void {
-    $container->get('module_installer')->install([
-      'package_manager_test_release_history',
-    ]);
-    $this->container = $container->get('kernel')->getContainer();
-
-    // To prevent tests from making real requests to the Internet, use fake
-    // release metadata that exposes a pretend Drupal 9.8.2 release.
-    $this->setReleaseMetadata(__DIR__ . '/../../../package_manager/tests/fixtures/release-history/drupal.9.8.2.xml');
-
-    parent::installModulesFromClassProperty($container);
+    $this->config('automatic_updates.settings')
+      ->set('unattended.level', CronUpdateRunner::SECURITY)
+      ->save();
+    $this->mockActiveCoreVersion('9.8.0');
   }
 
   /**
@@ -83,7 +54,7 @@ abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
     $service_ids = [
       // If automatic_updates is installed, ensure any stage directory created
       // during the test is cleaned up.
-      'automatic_updates.updater',
+      UpdateStage::class,
     ];
     foreach ($service_ids as $service_id) {
       if ($this->container->has($service_id)) {
@@ -94,37 +65,10 @@ abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
   }
 
   /**
-   * Disables validators in the test site's settings.
-   *
-   * This modifies the service container such that the disabled validators are
-   * not defined at all. This method will have no effect unless the
-   * automatic_updates_test_disable_validators module is installed.
-   *
-   * @param string[] $validators
-   *   The service IDs of the validators to disable.
-   *
-   * @see \Drupal\automatic_updates_test_disable_validators\AutomaticUpdatesTestDisableValidatorsServiceProvider::alter()
-   */
-  protected function disableValidators(array $validators): void {
-    $key = 'automatic_updates_test_disable_validators';
-    $disabled_validators = Settings::get($key, []);
-
-    foreach ($validators as $service_id) {
-      $disabled_validators[] = $service_id;
-    }
-    $this->writeSettings([
-      'settings' => [
-        $key => (object) [
-          'value' => $disabled_validators,
-          'required' => TRUE,
-        ],
-      ],
-    ]);
-    $this->rebuildContainer();
-  }
-
-  /**
    * Mocks the current (running) version of core, as known to the Update module.
+   *
+   * @todo Remove this function with use of the trait from the Update module in
+   *   https://drupal.org/i/3348234.
    *
    * @param string $version
    *   The version of core to mock.
@@ -132,27 +76,6 @@ abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
   protected function mockActiveCoreVersion(string $version): void {
     $this->config('update_test.settings')
       ->set('system_info.#all.version', $version)
-      ->save();
-  }
-
-  /**
-   * Sets the release metadata file to use when fetching available updates.
-   *
-   * @param string $file
-   *   The path of the XML metadata file to use.
-   */
-  protected function setReleaseMetadata(string $file): void {
-    $this->assertFileIsReadable($file);
-
-    $this->config('update.settings')
-      ->set('fetch.url', $this->baseUrl . '/test-release-history')
-      ->save();
-
-    [$project] = explode('.', basename($file, '.xml'), 2);
-    $xml_map = $this->config('update_test.settings')->get('xml_map') ?? [];
-    $xml_map[$project] = $file;
-    $this->config('update_test.settings')
-      ->set('xml_map', $xml_map)
       ->save();
   }
 
@@ -177,36 +100,26 @@ abstract class AutomaticUpdatesFunctionalTestBase extends BrowserTestBase {
     $assert_session = $this->assertSession();
     $assert_session->addressMatches('/\/admin\/automatic-update-ready\/[a-zA-Z0-9_\-]+$/');
     $assert_session->pageTextContainsOnce('Drupal core will be updated to ' . $target_version);
+    $button = $assert_session->buttonExists("Continue");
+    $this->assertTrue($button->hasClass('button--primary'));
   }
 
   /**
-   * Copies a fixture directory to a temporary directory.
-   *
-   * @param string $fixture_directory
-   *   The fixture directory.
-   *
-   * @return string
-   *   The temporary directory.
+   * Runs the console update command, which will trigger status checks.
    */
-  protected function copyFixtureToTempDirectory(string $fixture_directory): string {
-    $temp_directory = $this->root . DIRECTORY_SEPARATOR . $this->siteDirectory . DIRECTORY_SEPARATOR . $this->randomMachineName(20);
-    static::copyFixtureFilesTo($fixture_directory, $temp_directory);
-    return $temp_directory;
-  }
+  protected function runConsoleUpdateCommand(): void {
+    // Ensure that a valid test user agent cookie has been generated.
+    $this->prepareRequest();
 
-  /**
-   * Sets a fixture directory to use as the active directory.
-   *
-   * @param string $fixture_directory
-   *   The fixture directory.
-   */
-  protected function useFixtureDirectoryAsActive(string $fixture_directory): void {
-    // Create a temporary directory from our fixture directory that will be
-    // unique for each test run. This will enable changing files in the
-    // directory and not affect other tests.
-    $active_dir = $this->copyFixtureToTempDirectory($fixture_directory);
-    $this->container->get('package_manager.path_locator')
-      ->setPaths($active_dir, $active_dir . '/vendor', '', NULL);
+    $this->container->get(CommandExecutor::class)
+      ->create('--is-from-web')
+      ->setEnv([
+        // Ensure that the command will boot up and run in the test site.
+        // @see drupal_valid_test_ua()
+        'HTTP_USER_AGENT' => $this->getSession()->getCookie('SIMPLETEST_USER_AGENT'),
+      ])
+      ->setWorkingDirectory($this->getDrupalRoot())
+      ->mustRun();
   }
 
 }

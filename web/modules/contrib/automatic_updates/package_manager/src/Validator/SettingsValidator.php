@@ -1,12 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
 use Drupal\Core\Site\Settings;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\Event\PreOperationStageEvent;
@@ -26,19 +25,9 @@ final class SettingsValidator implements EventSubscriberInterface {
   use StringTranslationTrait;
 
   /**
-   * Constructs a SettingsValidator object.
-   *
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The string translation service.
+   * Checks that Drupal's settings are valid for Package Manager.
    */
-  public function __construct(TranslationInterface $translation) {
-    $this->setStringTranslation($translation);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function validateStagePreOperation(PreOperationStageEvent $event): void {
+  public function validate(PreOperationStageEvent $event): void {
     if (Settings::get('update_fetch_with_http_fallback')) {
       $event->addError([
         $this->t('The <code>update_fetch_with_http_fallback</code> setting must be disabled.'),
@@ -51,9 +40,9 @@ final class SettingsValidator implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents(): array {
     return [
-      PreCreateEvent::class => 'validateStagePreOperation',
-      PreApplyEvent::class => 'validateStagePreOperation',
-      StatusCheckEvent::class => 'validateStagePreOperation',
+      PreCreateEvent::class => 'validate',
+      PreApplyEvent::class => 'validate',
+      StatusCheckEvent::class => 'validate',
     ];
   }
 

@@ -1,24 +1,22 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
 use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\package_manager\Event\CollectIgnoredPathsEvent;
-use Drupal\package_manager\Event\ExcludedPathsTrait;
 use Drupal\package_manager\Event\PostApplyEvent;
 use Drupal\package_manager\Event\PostCreateEvent;
-use Drupal\package_manager\Event\PostDestroyEvent;
 use Drupal\package_manager\Event\PostRequireEvent;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
-use Drupal\package_manager\Event\PreDestroyEvent;
 use Drupal\package_manager\Event\PreOperationStageEvent;
 use Drupal\package_manager\Event\PreRequireEvent;
 use Drupal\package_manager\Event\StageEvent;
 use Drupal\package_manager\Event\StatusCheckEvent;
+use Drupal\package_manager\Exception\StageEventException;
 use Drupal\package_manager\ValidationResult;
+use PhpTuf\ComposerStager\API\Path\Value\PathListInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -40,7 +38,7 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
   /**
    * The stage under test.
    *
-   * @var \Drupal\package_manager\Stage
+   * @var \Drupal\package_manager\StageBase
    */
   private $stage;
 
@@ -75,8 +73,6 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
       PostRequireEvent::class => 'handleEvent',
       PreApplyEvent::class => 'handleEvent',
       PostApplyEvent::class => 'handleEvent',
-      PreDestroyEvent::class => 'handleEvent',
-      PostDestroyEvent::class => 'handleEvent',
     ];
   }
 
@@ -90,7 +86,7 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
     array_push($this->events, get_class($event));
 
     // The event should have a reference to the stage which fired it.
-    $this->assertSame($event->getStage(), $this->stage);
+    $this->assertSame($event->stage, $this->stage);
   }
 
   /**
@@ -112,8 +108,6 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
       PostRequireEvent::class,
       PreApplyEvent::class,
       PostApplyEvent::class,
-      PreDestroyEvent::class,
-      PostDestroyEvent::class,
     ]);
   }
 
@@ -123,12 +117,11 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
    * @return string[][]
    *   The test cases.
    */
-  public function providerValidationResults(): array {
+  public static function providerValidationResults(): array {
     return [
       'PreCreateEvent' => [PreCreateEvent::class],
       'PreRequireEvent' => [PreRequireEvent::class],
       'PreApplyEvent' => [PreApplyEvent::class],
-      'PreDestroyEvent' => [PreDestroyEvent::class],
     ];
   }
 
@@ -158,6 +151,36 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
   }
 
   /**
+   * Tests adding validation results to events.
+   */
+  public function testAddResult(): void {
+    $stage = $this->createStage();
+
+    $error = ValidationResult::createError([
+      t('Burn, baby, burn!'),
+    ]);
+    $warning = ValidationResult::createWarning([
+      t('The path ahead is scary...'),
+    ]);
+    $excluded_paths = $this->createMock(PathListInterface::class);
+
+    // Status check events can accept both errors and warnings.
+    $event = new StatusCheckEvent($stage, $excluded_paths);
+    $event->addResult($error);
+    $event->addResult($warning);
+    $this->assertSame([$error, $warning], $event->getResults());
+
+    // Other stage events will accept errors, but throw an exception if you try
+    // to add a warning.
+    $event = new PreCreateEvent($stage, $excluded_paths);
+    $event->addResult($error);
+    $this->assertSame([$error], $event->getResults());
+    $this->expectException(\InvalidArgumentException::class);
+    $this->expectExceptionMessage('Only errors are allowed.');
+    $event->addResult($warning);
+  }
+
+  /**
    * Tests that pre- and post-require events have access to the package lists.
    */
   public function testPackageListsAvailableToRequireEvents(): void {
@@ -177,24 +200,6 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
   }
 
   /**
-   * @group legacy
-   */
-  public function testDeprecations(): void {
-    $stage = $this->createStage();
-    $this->expectDeprecation('Calling ' . StatusCheckEvent::class . '::__construct() without the $ignored_paths argument is deprecated in automatic_updates:8.x-2.5 and will be removed in automatic_updates:3.0.0. See https://www.drupal.org/node/3317862.');
-    $this->expectDeprecation(ExcludedPathsTrait::class . '::excludePath() is deprecated in automatic_updates:8.x-2.5 and removed in automatic_updates:3.0.0. Use ' . CollectIgnoredPathsEvent::class . ' instead. See https://www.drupal.org/node/3317862.');
-    (new StatusCheckEvent($stage))->excludePath('/junk/drawer');
-
-    $this->expectDeprecation('Calling ' . PreCreateEvent::class . '::__construct() without the $ignored_paths argument is deprecated in automatic_updates:8.x-2.5 and will be removed in automatic_updates:3.0.0. See https://www.drupal.org/node/3317862.');
-    $this->expectDeprecation(ExcludedPathsTrait::class . '::excludePath() is deprecated in automatic_updates:8.x-2.5 and removed in automatic_updates:3.0.0. Use ' . CollectIgnoredPathsEvent::class . ' instead. See https://www.drupal.org/node/3317862.');
-    (new PreCreateEvent($stage))->excludePath('/junk/drawer');
-
-    $this->expectDeprecation('Calling ' . PreApplyEvent::class . '::__construct() without the $ignored_paths argument is deprecated in automatic_updates:8.x-2.5 and will be removed in automatic_updates:3.0.0. See https://www.drupal.org/node/3317862.');
-    $this->expectDeprecation(ExcludedPathsTrait::class . '::excludePath() is deprecated in automatic_updates:8.x-2.5 and removed in automatic_updates:3.0.0. Use ' . CollectIgnoredPathsEvent::class . ' instead. See https://www.drupal.org/node/3317862.');
-    (new PreApplyEvent($stage))->excludePath('/junk/drawer');
-  }
-
-  /**
    * Tests exception is thrown if error is not added before stopPropagation().
    */
   public function testExceptionIfNoErrorBeforeStopPropagation(): void {
@@ -203,7 +208,7 @@ class StageEventsTest extends PackageManagerKernelTestBase implements EventSubsc
     };
     $this->addEventTestListener($listener, PreCreateEvent::class);
 
-    $this->expectException(TestStageValidationException::class);
+    $this->expectException(StageEventException::class);
     $this->expectExceptionMessage('Event propagation stopped without any errors added to the event. This bypasses the package_manager validation system.');
     $stage = $this->createStage();
     $stage->create();

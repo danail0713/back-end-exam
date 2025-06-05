@@ -1,0 +1,5 @@
+name: 'admin_login'
+type: module
+description: 'This module adds login form to enter as administrators.'
+package: Custom
+core_version_requirement: ^10 || ^11

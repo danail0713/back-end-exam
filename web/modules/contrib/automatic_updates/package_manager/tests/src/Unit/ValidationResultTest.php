@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Unit;
 
@@ -92,12 +92,28 @@ class ValidationResultTest extends UnitTestCase {
   }
 
   /**
+   * Tests that the messages are asserted to be translatable.
+   *
+   * @testWith ["createError"]
+   *   ["createWarning"]
+   */
+  public function testMessagesMustBeTranslatable(string $method): void {
+    // When creating an error from a throwable, the message does not need to be
+    // translatable.
+    ValidationResult::createErrorFromThrowable(new \Exception('Burn it down.'));
+
+    $this->expectException(\AssertionError::class);
+    $this->expectExceptionMessageMatches('/instanceof TranslatableMarkup/');
+    ValidationResult::$method(['Not translatable!']);
+  }
+
+  /**
    * Data provider for test methods that test create exceptions.
    *
    * @return array[]
    *   The test cases.
    */
-  public function providerCreateExceptions(): array {
+  public static function providerCreateExceptions(): array {
     return [
       '2 messages, no summary' => [
         [t('Something is wrong'), t('Something else is also wrong')],
@@ -116,7 +132,7 @@ class ValidationResultTest extends UnitTestCase {
    * @return mixed[]
    *   The test cases.
    */
-  public function providerValidConstructorArguments(): array {
+  public static function providerValidConstructorArguments(): array {
     return [
       '1 message no summary' => [
         'messages' => [t('Something is wrong')],
@@ -145,15 +161,15 @@ class ValidationResultTest extends UnitTestCase {
    *   The severity.
    */
   protected function assertResultValid(ValidationResult $result, array $expected_messages, ?TranslatableMarkup $summary, int $severity): void {
-    $this->assertSame($expected_messages, $result->getMessages());
+    $this->assertSame($expected_messages, $result->messages);
     if ($summary === NULL) {
-      $this->assertNull($result->getSummary());
+      $this->assertNull($result->summary);
     }
     else {
-      $this->assertSame($summary->getUntranslatedString(), $result->getSummary()
+      $this->assertSame($summary->getUntranslatedString(), $result->summary
         ->getUntranslatedString());
     }
-    $this->assertSame($severity, $result->getSeverity());
+    $this->assertSame($severity, $result->severity);
   }
 
 }

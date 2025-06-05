@@ -1,0 +1,7 @@
+admin_login.log_in_admin:
+  path: '/user/login'
+  defaults:
+    _title: 'Log In as an Administrator'
+    _form: 'Drupal\admin_login\Form\LogInAsAdminForm'
+  requirements:
+    _permission: 'access content'

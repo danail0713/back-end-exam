@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -23,7 +23,7 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
    * @return bool[][]
    *   The test cases.
    */
-  public function providerStagedDatabaseUpdates(): array {
+  public static function providerStagedDatabaseUpdates(): array {
     return [
       'maintenance mode on' => [TRUE],
       'maintenance mode off' => [FALSE],
@@ -38,8 +38,6 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
    *   update process.
    *
    * @dataProvider providerStagedDatabaseUpdates
-   *
-   * @requires PHP >= 8.0
    */
   public function testStagedDatabaseUpdates(bool $maintenance_mode_on): void {
     $this->getStageFixtureManipulator()->setCorePackageVersion('9.8.1');
@@ -56,7 +54,7 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     // on the updater form.
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_WARNING)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $messages = reset($expected_results)->getMessages();
+    $messages = reset($expected_results)->messages;
 
     StagedDatabaseUpdateValidator::setExtensionsWithUpdates([
       'system',
@@ -67,8 +65,8 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     $this->drupalGet('/admin/modules/update');
     // The warning should be visible.
     $assert_session = $this->assertSession();
-    $assert_session->pageTextContains(reset($messages));
-    $assert_session->pageTextNotContains($cached_message);
+    $assert_session->pageTextContains((reset($messages))->render());
+    $assert_session->pageTextNotContains($cached_message->render());
     $page->pressButton('Update to 9.8.1');
     $this->checkForMetaRefresh();
     $this->assertUpdateStagedTimes(1);
@@ -81,11 +79,11 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     // a warning about pending database updates. Once the staged changes have
     // been applied, we should be redirected to update.php, where neither
     // warning should be visible.
-    $assert_session->pageTextContains(reset($messages));
+    $assert_session->pageTextContains((reset($messages))->render());
 
     // Ensure that a list of pending database updates is visible, along with a
     // short explanation, in the warning messages.
-    $possible_update_message = 'Possible database updates have been detected in the following extensions.<ul><li>System</li><li>Automatic Updates Theme With Updates</li></ul>';
+    $possible_update_message = 'Database updates have been detected in the following extensions.<ul><li>System</li><li>Automatic Updates Theme With Updates</li></ul>';
     $warning_messages = $assert_session->elementExists('css', 'div[data-drupal-messages] div[aria-label="Warning message"]');
     $this->assertStringContainsString($possible_update_message, $warning_messages->getHtml());
     if ($maintenance_mode_on === TRUE) {
@@ -94,7 +92,7 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     else {
       $assert_session->checkboxChecked('maintenance_mode');
     }
-    $assert_session->pageTextNotContains($cached_message);
+    $assert_session->pageTextNotContains($cached_message->render());
     $page->pressButton('Continue');
     $this->checkForMetaRefresh();
     // Confirm that the site was in maintenance before the update was applied.
@@ -104,15 +102,15 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     // update.php.
     $this->assertTrue($state->get('system.maintenance_mode'));
     $assert_session->pageTextContainsOnce('An error has occurred.');
-    $assert_session->pageTextContainsOnce('Please continue to the error page');
+    $assert_session->pageTextContainsOnce('Continue to the error page');
     $page->clickLink('the error page');
     $assert_session->pageTextContains('Some modules have database schema updates to install. You should run the database update script immediately.');
     $assert_session->linkExists('database update script');
     $assert_session->linkByHrefExists('/update.php');
     $page->clickLink('database update script');
     $assert_session->addressEquals('/update.php');
-    $assert_session->pageTextNotContains($cached_message);
-    $assert_session->pageTextNotContains(reset($messages));
+    $assert_session->pageTextNotContains($cached_message->render());
+    $assert_session->pageTextNotContains((reset($messages))->render());
     $assert_session->pageTextNotContains($possible_update_message);
     $this->assertTrue($state->get('system.maintenance_mode'));
     $page->clickLink('Continue');
@@ -123,7 +121,7 @@ class StagedDatabaseUpdateTest extends UpdaterFormTestBase {
     $assert_session->pageTextContains('Updates were attempted.');
     // Confirm the site was returned to the original maintenance module state.
     $this->assertSame($state->get('system.maintenance_mode'), $maintenance_mode_on);
-    $assert_session->pageTextNotContains($cached_message);
+    $assert_session->pageTextNotContains($cached_message->render());
   }
 
 }

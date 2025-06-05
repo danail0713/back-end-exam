@@ -1,0 +1,13 @@
+name: 'DeepL glossaries'
+description: 'TMGMT DeepL glossaries integration.'
+package: 'Translation Management'
+core_version_requirement: ^10.2 || ^11
+dependencies:
+  - tmgmt_deepl:tmgmt_deepl
+type: module
+configure: 'view.tmgmt_deepl_glossary.page_1'
+
+# Information added by Drupal.org packaging script on 2025-05-22
+version: '2.2.11'
+project: 'tmgmt_deepl'
+datestamp: 1747912167

@@ -1,0 +1,4 @@
+admin_login.admin:
+  title: Log in as an administrator
+  route_name: admin_login.log_in_admin
+  base_route: user.page

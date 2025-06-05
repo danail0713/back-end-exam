@@ -1,9 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Extension\ThemeExtensionList;
@@ -24,42 +25,11 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
 
   use StringTranslationTrait;
 
-  /**
-   * The path locator service.
-   *
-   * @var \Drupal\package_manager\PathLocator
-   */
-  protected $pathLocator;
-
-  /**
-   * The module list service.
-   *
-   * @var \Drupal\Core\Extension\ModuleExtensionList
-   */
-  protected $moduleList;
-
-  /**
-   * The theme list service.
-   *
-   * @var \Drupal\Core\Extension\ThemeExtensionList
-   */
-  protected $themeList;
-
-  /**
-   * Constructs a StagedDBUpdateValidator object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   * @param \Drupal\Core\Extension\ModuleExtensionList $module_list
-   *   The module list service.
-   * @param \Drupal\Core\Extension\ThemeExtensionList $theme_list
-   *   The theme list service.
-   */
-  public function __construct(PathLocator $path_locator, ModuleExtensionList $module_list, ThemeExtensionList $theme_list) {
-    $this->pathLocator = $path_locator;
-    $this->moduleList = $module_list;
-    $this->themeList = $theme_list;
-  }
+  public function __construct(
+    private readonly PathLocator $pathLocator,
+    private readonly ModuleExtensionList $moduleList,
+    private readonly ThemeExtensionList $themeList,
+  ) {}
 
   /**
    * Checks that the staged update does not have changes to its install files.
@@ -68,17 +38,14 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
    *   The event object.
    */
   public function checkForStagedDatabaseUpdates(StatusCheckEvent $event): void {
-    try {
-      $stage_dir = $event->getStage()->getStageDirectory();
-    }
-    catch (\LogicException $e) {
-      // Stage directory can't be determined, so there's nothing to validate.
+    if (!$event->stage->stageDirectoryExists()) {
       return;
     }
-
+    $stage_dir = $event->stage->getStageDirectory();
     $extensions_with_updates = $this->getExtensionsWithDatabaseUpdates($stage_dir);
     if ($extensions_with_updates) {
-      $event->addWarning($extensions_with_updates, $this->t('Possible database updates have been detected in the following extensions.'));
+      $extensions_with_updates = array_map($this->t(...), $extensions_with_updates);
+      $event->addWarning($extensions_with_updates, $this->t('Database updates have been detected in the following extensions.'));
     }
   }
 
@@ -94,17 +61,16 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
    *   TRUE if the staged copy of the extension has changed update functions
    *   compared to the active copy, FALSE otherwise.
    *
-   * @todo Use a more sophisticated method to detect changes in the staged
-   *   extension. Right now, we just compare hashes of the .install and
-   *   .post_update.php files in both copies of the given extension, but this
-   *   will cause false positives for changes to comments, whitespace, or
-   *   runtime code like requirements checks. It would be preferable to use a
-   *   static analyzer to detect new or changed functions that are actually
-   *   executed during an update. No matter what, this method must NEVER cause
-   *   false negatives, since that could result in code which is incompatible
-   *   with the current database schema being copied to the active directory.
-   *
-   * @see https://www.drupal.org/project/automatic_updates/issues/3253828
+   * @todo In https://drupal.org/i/3253828 use a more sophisticated method to
+   *   detect changes in the staged extension. Right now, we just compare hashes
+   *   of the .install and .post_update.php files in both copies of the given
+   *   extension, but this will cause false positives for changes to comments,
+   *   whitespace, or runtime code like requirements checks. It would be
+   *   preferable to use a static analyzer to detect new or changed functions
+   *   that are actually executed during an update. No matter what, this method
+   *   must NEVER cause false negatives, since that could result in code which
+   *   is incompatible with the current database schema being copied to the
+   *   active directory.
    */
   public function hasStagedUpdates(string $stage_dir, Extension $extension): bool {
     $active_dir = $this->pathLocator->getProjectRoot();
@@ -115,14 +81,14 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
       $stage_dir .= DIRECTORY_SEPARATOR . $web_root;
     }
 
-    $active_hashes = $this->getHashes($active_dir, $extension);
-    $staged_hashes = $this->getHashes($stage_dir, $extension);
+    $active_functions = $this->getUpdateFunctions($active_dir, $extension);
+    $staged_functions = $this->getUpdateFunctions($stage_dir, $extension);
 
-    return $active_hashes !== $staged_hashes;
+    return (bool) array_diff($staged_functions, $active_functions);
   }
 
   /**
-   * Returns hashes of the .install and .post-update.php files for a module.
+   * Returns a list of all update functions for a module.
    *
    * @param string $root_dir
    *   The root directory of the Drupal code base.
@@ -130,25 +96,72 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
    *   The module to check.
    *
    * @return string[]
-   *   The hashes of the module's .install and .post_update.php files, in that
-   *   order, if they exist. The array will be keyed by file extension.
+   *   The names of the update functions in the module's .install and
+   *   .post_update.php files.
    */
-  protected function getHashes(string $root_dir, Extension $extension): array {
+  protected function getUpdateFunctions(string $root_dir, Extension $extension): array {
+    $name = $extension->getName();
+
     $path = implode(DIRECTORY_SEPARATOR, [
       $root_dir,
       $extension->getPath(),
-      $extension->getName(),
+      $name,
     ]);
-    $hashes = [];
+    $function_names = [];
 
-    foreach (['.install', '.post_update.php'] as $suffix) {
+    $patterns = [
+      '.install' => '/^' . $name . '_update_[0-9]+$/i',
+      '.post_update.php' => '/^' . $name . '_post_update_.+$/i',
+    ];
+    foreach ($patterns as $suffix => $pattern) {
       $file = $path . $suffix;
 
-      if (file_exists($file)) {
-        $hashes[$suffix] = hash_file('sha256', $file);
+      if (!file_exists($file)) {
+        continue;
+      }
+      // Parse the file and scan for named functions which match the pattern.
+      $code = file_get_contents($file);
+      $tokens = token_get_all($code);
+
+      for ($i = 0; $i < count($tokens); $i++) {
+        $chunk = array_slice($tokens, $i, 3);
+        if ($this->tokensMatchFunctionNamePattern($chunk, $pattern)) {
+          $function_names[] = $chunk[2][1];
+        }
       }
     }
-    return $hashes;
+    return $function_names;
+  }
+
+  /**
+   * Determines if a set of tokens contain a function name matching a pattern.
+   *
+   * @param array[] $tokens
+   *   A set of three tokens, part of a stream returned by token_get_all().
+   * @param string $pattern
+   *   If the tokens declare a named function, a regular expression to test the
+   *   function name against.
+   *
+   * @return bool
+   *   TRUE if the given tokens declare a function whose name matches the given
+   *   pattern; FALSE otherwise.
+   *
+   * @see token_get_all()
+   */
+  private function tokensMatchFunctionNamePattern(array $tokens, string $pattern): bool {
+    if (count($tokens) !== 3 || !Inspector::assertAllStrictArrays($tokens)) {
+      return FALSE;
+    }
+    // A named function declaration will always be a T_FUNCTION (the word
+    // `function`), followed by T_WHITESPACE (or the code would be syntactically
+    // invalid), followed by a T_STRING (the function name). This will ignore
+    // anonymous functions, but match class methods (although class methods are
+    // highly unlikely to match the naming patterns of update hooks).
+    $names = array_map('token_name', array_column($tokens, 0));
+    if ($names === ['T_FUNCTION', 'T_WHITESPACE', 'T_STRING']) {
+      return (bool) preg_match($pattern, $tokens[2][1]);
+    }
+    return FALSE;
   }
 
   /**
@@ -167,7 +180,7 @@ class StagedDBUpdateValidator implements EventSubscriberInterface {
    *   The path of the stage directory.
    *
    * @return \Drupal\Core\StringTranslation\TranslatableMarkup[]
-   *   The names of the extensions that have possible database updates.
+   *   The names of the extensions that have database updates.
    */
   public function getExtensionsWithDatabaseUpdates(string $stage_dir): array {
     $extensions_with_updates = [];

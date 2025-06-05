@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Build;
 
@@ -21,7 +21,7 @@ abstract class UpdateTestBase extends TemplateProjectTestBase {
     parent::createTestProject($template);
     // @todo Remove in https://www.drupal.org/project/automatic_updates/issues/3284443
     $code = <<<END
-\$config['automatic_updates.settings']['cron'] = 'security';
+\$config['automatic_updates.settings']['unattended']['level'] = 'security';
 END;
     $this->writeSettings($code);
     // Install Automatic Updates, and other modules needed for testing.
@@ -29,6 +29,19 @@ END;
       'automatic_updates',
       'automatic_updates_test_api',
     ]);
+
+    // Uninstall Automated Cron because this will run cron updates on most
+    // requests, making it difficult to test other forms of updating.
+    // Also uninstall Big Pipe, since it may cause page elements to be rendered
+    // in the background and replaced with JavaScript, which isn't supported in
+    // build tests.
+    // @see \Drupal\Tests\automatic_updates\Build\CoreUpdateTest::testAutomatedCron
+    $page = $this->getMink()->getSession()->getPage();
+    $this->visit('/admin/modules/uninstall');
+    $page->checkField("uninstall[automated_cron]");
+    $page->checkField('uninstall[big_pipe]');
+    $page->pressButton('Uninstall');
+    $page->pressButton('Uninstall');
   }
 
   /**
@@ -69,8 +82,9 @@ END;
     $this->visit('/admin/reports/status');
     $mink = $this->getMink();
     $page = $mink->getSession()->getPage();
+    $page->clickLink('Rerun readiness checks');
 
-    $readiness_check_summaries = $page->findAll('css', 'summary:contains("Update readiness checks")');
+    $readiness_check_summaries = $page->findAll('css', '*:contains("Update readiness checks")');
     // There should always either be the summary section indicating the site is
     // ready for automatic updates or the error or warning sections.
     $this->assertNotEmpty($readiness_check_summaries);
@@ -82,7 +96,7 @@ END;
         $ready_text_found = TRUE;
         continue;
       }
-      $description_list = $parent_element->find('css', 'div.description ul');
+      $description_list = $parent_element->find('css', 'ul');
       $this->assertNotEmpty($description_list);
       $status_checks_text .= "\n" . $description_list->getText();
     }

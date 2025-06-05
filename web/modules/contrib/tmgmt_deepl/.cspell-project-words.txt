@@ -1,0 +1,9 @@
+# tmgmt_deepl related words
+authentification
+Bokmål
+deepl
+interpunction
+nonewlines
+occured
+tmgt
+unflatten

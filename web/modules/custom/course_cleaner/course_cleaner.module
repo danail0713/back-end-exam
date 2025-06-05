@@ -1,0 +1,34 @@
+<?php
+
+use Drupal\node\Entity\Node;
+use MongoDB\Client;
+
+/**
+ * Implements hook_cron().
+ */
+function course_cleaner_cron() {
+  $today_date = (new DateTime())->format('Y-m-d');
+  // Query courses that start today.
+  $course_ids = \Drupal::entityQuery('node')
+    ->condition('type', 'courses')
+    ->accessCheck(true)
+    ->execute(); // Replace with your real field name.
+  $courses = Node::loadMultiple($course_ids);
+  $filtered_courses = array_filter($courses, fn($course) => $course->get('field_start_date')->value == $today_date);
+  $filtered_course_ids = array_map(fn($course) => $course->id(), $filtered_courses);
+  if ($filtered_course_ids) {
+    $client = new Client('mongodb://localhost:27017');
+    $themes = $client->getDatabase('test')->getCollection('themes');
+    foreach ($filtered_course_ids as $course_id) {
+      $course_themes = $themes->find(['course_id' => $course_id])->toArray();
+      if (!$course_themes) {
+        $course = Node::load($course_id);
+        $deleted_course_name = $course->label();
+        $course->delete();
+        \Drupal::state()->set('course_cleaner_message', $deleted_course_name);
+      }
+    }
+  }
+}
+
+

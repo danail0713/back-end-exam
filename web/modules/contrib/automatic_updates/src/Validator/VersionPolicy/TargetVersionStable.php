@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Validator\VersionPolicy;
 
-use Drupal\Core\Extension\ExtensionVersion;
+use Composer\Semver\VersionParser;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 
 /**
@@ -31,10 +31,7 @@ final class TargetVersionStable {
    *   The error messages, if any.
    */
   public function validate(string $installed_version, ?string $target_version): array {
-    $extra = ExtensionVersion::createFromVersionString($target_version)
-      ->getVersionExtra();
-
-    if ($extra) {
+    if (VersionParser::parseStability($target_version) !== 'stable') {
       return [
         $this->t('Drupal cannot be automatically updated during cron to the recommended version, @target_version, because it is not a stable version.', [
           '@target_version' => $target_version,

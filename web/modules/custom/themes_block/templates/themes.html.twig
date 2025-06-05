@@ -1,5 +1,5 @@
 <div class="themes">
-	<h3>Themes</h3>
+	<h3>{{ 'Themes'|t }}</h3>
 	<ol class="themes-list">
 		{% if themes %}
 			{% for theme in themes %}
@@ -11,35 +11,70 @@
 					</div>
 					<div class="theme-body" id="theme-content-{{ loop.index }}">
 						<p class="theme-description">{{ theme.description|raw }}</p>
-						<strong>Resources</strong>
-						{% if theme.resources and user_enrolled and theme.accessResources == true %}
+
+						<strong>{{ 'Resources'|t }}</strong>
+						{% if theme.resources is not empty and ((user_enrolled and theme.accessResources == true) or user_course_instructor) %}
 							<ul class="theme-resources">
 								{% for resource in theme.resources %}
 									<li>
-										<a href="{{ resource.fileUrl }}">{{ resource.fileName}}</a>
+										<a href="{{ resource.url }}">{{ resource.name }}</a>
 									</li>
 								{% endfor %}
 							</ul>
-              <br>
-						{% elseif not theme.resources %}
-							<p>No resources available.</p>
+							<br>
+						{% elseif theme.resources is empty %}
+							<p>{{ 'No resources available.'|t }}</p>
 						{% elseif not user_enrolled %}
-							<p>You haven't access rights to the resources.</p>
+							<p>{{ "You don't have access to the resources."|t }}</p>
 						{% elseif accessResources == false %}
-							<p>You can't access the resources because you haven't made the homework from the previous theme.</p>
+							<p>{{ "You can't access the resources because you haven't made the homework from the previous theme."|t }}</p>
 						{% endif %}
-            {% if user_enrolled and theme.homework %}
-              <strong>Homework</strong>
-							<p>{{theme.homework|raw}}</p>
-            {% elseif not theme.homework and user_enrolled %}
-              <strong>Homework</strong>
-							<p>No homework yet.</p>
-            {% endif %}
-					</div>
+
+						{% if theme.homework_response is empty and theme.accessResources == true %}
+							{% if user_enrolled and theme.homework != 'no homeworks accepted' and theme.homework != '' %}
+								<strong>{{ 'Homework'|t }}</strong>
+								{% if not theme.submitted_homework %}
+									<p>{{ theme.homework|raw }}</p>
+									{{ homework_form }}
+								{% else %}
+									<p>{{ "You've already sent your homework for check. Waiting for grade."|t }}</p>
+								{% endif %}
+							{% elseif theme.homework == 'no homeworks accepted' and user_enrolled %}
+								<strong>{{ 'Homework'|t }}</strong>
+								<p>{{ 'The time for sending homeworks has expired.'|t }}</p>
+							{% elseif not theme.homework and user_enrolled %}
+								<strong>{{ 'Homework'|t }}</strong>
+								<p>{{ 'No homework yet.'|t }}</p>
+							{% endif %}
+						{% elseif theme.homework_response is not empty and theme.homework_response.grade < 4.50 %}
+							<h4>{{ 'Homework grade:'|t }} {{ theme.homework_response.grade }}</h4>
+							<h4>{{ 'Homework comment:'|t }}</h4>
+							{{ theme.homework_response.comment }}
+							{% if theme.homework != 'no homeworks accepted' %}
+								<h5>{{ 'Send homework again for a higher grade.'|t }}</h5>
+								{{ homework_form }}
+							{% else %}
+								<p>{{ 'The time for sending homeworks has expired.'|t }}</p>
+							{% endif %}
+						</div>
+					{% elseif theme.homework_response is not empty and theme.homework_response.grade >= 4.50 %}
+						<h4>{{ 'Homework grade:'|t }} {{ theme.homework_response.grade }}</h4>
+						<h4>{{ 'Homework comment:'|t }}</h4>
+						{{ theme.homework_response.comment }}
+						<h5>{{ 'You can access the resources from the next lection.'|t }}</h5>
+					{% endif %}
 				</li>
 			{% endfor %}
 		{% else %}
-			<p>No themes found.</p>
+			<p>{{ 'No themes found.'|t }}</p>
 		{% endif %}
 	</ol>
 </div>
+
+<style>
+	.homework-submit-btn {
+		font-size: 1rem;
+		padding: 4px 12px;
+	}
+</style>
+

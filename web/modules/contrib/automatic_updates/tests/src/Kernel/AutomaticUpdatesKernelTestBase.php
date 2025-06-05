@@ -1,16 +1,18 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Kernel;
 
-use Drupal\automatic_updates\CronUpdater;
-use Drupal\automatic_updates\Updater;
+use ColinODell\PsrTestLogger\TestLogger;
+use Drupal\automatic_updates\CronUpdateRunner;
+use Drupal\automatic_updates\ConsoleUpdateStage;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\Core\Url;
+use Drupal\Core\Logger\RfcLogLevel;
+use Drupal\package_manager\Validator\SymlinkValidator;
+use Drupal\package_manager\Validator\WritableFileSystemValidator;
 use Drupal\Tests\automatic_updates\Traits\ValidationTestTrait;
 use Drupal\Tests\package_manager\Kernel\PackageManagerKernelTestBase;
-use Drupal\Tests\package_manager\Kernel\TestStageTrait;
 
 /**
  * Base class for kernel tests of the Automatic Updates module.
@@ -42,18 +44,23 @@ abstract class AutomaticUpdatesKernelTestBase extends PackageManagerKernelTestBa
   protected function setUp(): void {
     // If Package Manager's file system permissions validator is disabled, also
     // disable the Automatic Updates validator which wraps it.
-    if (in_array('package_manager.validator.file_system', $this->disableValidators, TRUE)) {
+    if (in_array(WritableFileSystemValidator::class, $this->disableValidators, TRUE)) {
       $this->disableValidators[] = 'automatic_updates.validator.file_system_permissions';
     }
     // If Package Manager's symlink validator is disabled, also disable the
     // Automatic Updates validator which wraps it.
-    if (in_array('package_manager.validator.symlink', $this->disableValidators, TRUE)) {
+    if (in_array(SymlinkValidator::class, $this->disableValidators, TRUE)) {
       $this->disableValidators[] = 'automatic_updates.validator.symlink';
     }
     parent::setUp();
     // Enable cron updates, which will eventually be the default.
     // @todo Remove in https://www.drupal.org/project/automatic_updates/issues/3284443
-    $this->config('automatic_updates.settings')->set('cron', CronUpdater::SECURITY)->save();
+    $this->config('automatic_updates.settings')
+      ->set('unattended', [
+        'method' => 'web',
+        'level' => CronUpdateRunner::SECURITY,
+      ])
+      ->save();
 
     // By default, pretend we're running Drupal core 9.8.0 and a non-security
     // update to 9.8.1 is available.
@@ -64,6 +71,13 @@ abstract class AutomaticUpdatesKernelTestBase extends PackageManagerKernelTestBa
     // from a sane state.
     // @see \Drupal\automatic_updates\Validator\CronFrequencyValidator
     $this->container->get('state')->set('system.cron_last', time());
+
+    // Cron updates are not done when running at the command line, so override
+    // our cron handler's PHP_SAPI constant to a valid value that isn't `cli`.
+    // The choice of `cgi-fcgi` is arbitrary; see
+    // https://www.php.net/php_sapi_name for some valid values of PHP_SAPI.
+    $property = new \ReflectionProperty(CronUpdateRunner::class, 'serverApi');
+    $property->setValue(NULL, 'cgi-fcgi');
   }
 
   /**
@@ -72,10 +86,10 @@ abstract class AutomaticUpdatesKernelTestBase extends PackageManagerKernelTestBa
   public function register(ContainerBuilder $container) {
     parent::register($container);
 
-    // Use the test-only implementations of the regular and cron updaters.
+    // Use the test-only implementations of the regular and cron update runner.
     $overrides = [
-      'automatic_updates.updater' => TestUpdater::class,
-      'automatic_updates.cron_updater' => TestCronUpdater::class,
+      CronUpdateRunner::class => TestCronUpdateRunner::class,
+      ConsoleUpdateStage::class => TestConsoleUpdateStage::class,
     ];
     foreach ($overrides as $service_id => $class) {
       if ($container->hasDefinition($service_id)) {
@@ -84,39 +98,81 @@ abstract class AutomaticUpdatesKernelTestBase extends PackageManagerKernelTestBa
     }
   }
 
-}
-
-/**
- * A test-only version of the regular updater to override internals.
- */
-class TestUpdater extends Updater {
-
-  use TestStageTrait;
+  /**
+   * Performs an update using the console update stage directly.
+   */
+  protected function runConsoleUpdateStage(): void {
+    $this->container->get(ConsoleUpdateStage::class)->performUpdate();
+  }
 
   /**
-   * {@inheritdoc}
+   * Asserts that an exception containing a particular message was logged.
+   *
+   * @param string $message
+   *   The message that should have been logged.
+   * @param \ColinODell\PsrTestLogger\TestLogger $logger
+   *   The logger.
    */
-  public function setMetadata(string $key, $data): void {
-    parent::setMetadata($key, $data);
+  protected function assertExceptionLogged(string $message, TestLogger $logger): void {
+    $predicate = fn ($record) => str_contains($record['context']['@message'] ?? '', $message);
+    $this->assertTrue($logger->hasRecordThatPasses($predicate, RfcLogLevel::ERROR));
   }
 
 }
 
 /**
- * A test-only version of the cron updater to override and expose internals.
+ * A test-only version of the cron update runner to override and expose internals.
  */
-class TestCronUpdater extends CronUpdater {
-
-  use TestStageTrait;
+class TestCronUpdateRunner extends CronUpdateRunner {
 
   /**
    * {@inheritdoc}
    */
-  protected function triggerPostApply(Url $url): void {
-    // Subrequests don't work in kernel tests, so just call the post-apply
-    // handler directly.
-    $parameters = $url->getRouteParameters();
-    $this->handlePostApply($parameters['stage_id'], $parameters['installed_version'], $parameters['target_version']);
+  protected function runTerminalUpdateCommand(): never {
+    // Invoking the terminal command will not work and is not necessary in
+    // kernel tests. Throw an exception for tests that need to assert that
+    // the terminal command would have been invoked.
+    throw new \BadMethodCallException(static::class);
+  }
+
+}
+
+/**
+ * A test version of the console update stage to override and expose internals.
+ */
+class TestConsoleUpdateStage extends ConsoleUpdateStage {
+
+  /**
+   * {@inheritdoc}
+   */
+  protected string $type = 'automatic_updates:unattended';
+
+  /**
+   * {@inheritdoc}
+   */
+  public function apply(?int $timeout = 600): void {
+    parent::apply($timeout);
+
+    if (\Drupal::state()->get('system.maintenance_mode')) {
+      $this->logger->info('Unattended update was applied in maintenance mode.');
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function postApply(): void {
+    if (\Drupal::state()->get('system.maintenance_mode')) {
+      $this->logger->info('postApply() was called in maintenance mode.');
+    }
+    parent::postApply();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function triggerPostApply(string $stage_id): void {
+    $this->handlePostApply($stage_id);
   }
 
 }

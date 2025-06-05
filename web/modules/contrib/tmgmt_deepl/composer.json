@@ -1,0 +1,14 @@
+{
+  "name": "drupal/tmgmt_deepl",
+  "description": "TMGMT Translator DeepL",
+  "type": "drupal-module",
+  "homepage": "https://drupal.org/project/tmgmt_deepl",
+  "support": {
+    "issues": "https://www.drupal.org/project/issues/tmgmt_deepl",
+    "source": "https://git.drupalcode.org/project/tmgmt_deepl"
+  },
+  "license": "GPL-2.0-or-later",
+  "require": {
+    "drupal/tmgmt": "^1.0"
+  }
+}

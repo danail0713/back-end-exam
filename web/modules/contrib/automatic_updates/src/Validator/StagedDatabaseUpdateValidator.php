@@ -1,12 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Validator;
 
-use Drupal\automatic_updates\CronUpdater;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Validator\StagedDBUpdateValidator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -19,28 +17,11 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *   at any time without warning. External code should not interact with this
  *   class.
  */
-class StagedDatabaseUpdateValidator implements EventSubscriberInterface {
+final class StagedDatabaseUpdateValidator implements EventSubscriberInterface {
 
   use StringTranslationTrait;
 
-  /**
-   * The Staged DB Update Validator service.
-   *
-   * @var \Drupal\package_manager\Validator\StagedDBUpdateValidator
-   */
-  protected $stagedDBUpdateValidator;
-
-  /**
-   * Constructs a StagedDatabaseUpdateValidator object.
-   *
-   * @param \Drupal\package_manager\Validator\StagedDBUpdateValidator $staged_db_update_update_validator
-   *   The Staged DB Update Validator service.
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The string translation service.
-   */
-  public function __construct(StagedDBUpdateValidator $staged_db_update_update_validator, TranslationInterface $translation) {
-    $this->stagedDBUpdateValidator = $staged_db_update_update_validator;
-    $this->setStringTranslation($translation);
+  public function __construct(private readonly StagedDBUpdateValidator $stagedDBUpdateValidator) {
   }
 
   /**
@@ -50,14 +31,15 @@ class StagedDatabaseUpdateValidator implements EventSubscriberInterface {
    *   The event object.
    */
   public function checkUpdateHooks(PreApplyEvent $event): void {
-    $stage = $event->getStage();
-    if (!$stage instanceof CronUpdater) {
+    $stage = $event->stage;
+    if ($stage->getType() !== 'automatic_updates:unattended') {
       return;
     }
 
     $invalid_extensions = $this->stagedDBUpdateValidator->getExtensionsWithDatabaseUpdates($stage->getStageDirectory());
     if ($invalid_extensions) {
-      $event->addError($invalid_extensions, $this->t('The update cannot proceed because possible database updates have been detected in the following extensions.'));
+      $invalid_extensions = array_map($this->t(...), $invalid_extensions);
+      $event->addError($invalid_extensions, $this->t('The update cannot proceed because database updates have been detected in the following extensions.'));
     }
   }
 

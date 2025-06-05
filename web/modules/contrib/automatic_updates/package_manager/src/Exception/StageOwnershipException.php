@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Exception;
 
@@ -9,5 +9,5 @@ namespace Drupal\package_manager\Exception;
  *
  * Should not be thrown by external code.
  */
-class StageOwnershipException extends StageException {
+final class StageOwnershipException extends StageException {
 }

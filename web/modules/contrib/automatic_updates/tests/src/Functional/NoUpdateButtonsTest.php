@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -17,7 +17,7 @@ class NoUpdateButtonsTest extends UpdaterFormTestBase {
    * @return string[][]
    *   The test cases.
    */
-  public function providerUpdateFormReferringUrl(): array {
+  public static function providerUpdateFormReferringUrl(): array {
     return [
       'Modules page' => ['/admin/modules/update'],
       'Reports page' => ['/admin/reports/updates/update'],
@@ -28,7 +28,7 @@ class NoUpdateButtonsTest extends UpdaterFormTestBase {
    * Tests that the form doesn't display any buttons if Drupal is up-to-date.
    *
    * @todo Mark this test as skipped if the web server is PHP's built-in, single
-   *   threaded server.
+   *   threaded server in https://drupal.org/i/3348251.
    *
    * @param string $update_form_url
    *   The URL of the update form to visit.

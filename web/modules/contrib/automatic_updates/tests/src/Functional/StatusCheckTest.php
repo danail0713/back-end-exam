@@ -1,15 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
 use Behat\Mink\Element\NodeElement;
-use Drupal\automatic_updates\CronUpdater;
+use Drupal\automatic_updates\CronUpdateRunner;
 use Drupal\automatic_updates\StatusCheckMailer;
-use Drupal\automatic_updates_test\Datetime\TestTime;
+use Drupal\automatic_updates\Validation\StatusChecker;
 use Drupal\automatic_updates_test\EventSubscriber\TestSubscriber1;
-use Drupal\automatic_updates_test2\EventSubscriber\TestSubscriber2;
+use Drupal\automatic_updates_test_status_checker\EventSubscriber\TestSubscriber2;
 use Drupal\Core\Url;
 use Drupal\package_manager\Event\StatusCheckEvent;
 use Drupal\package_manager\ValidationResult;
@@ -60,6 +60,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
    */
   protected static $modules = [
     'package_manager_test_validation',
+    'block',
   ];
 
   /**
@@ -73,6 +74,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     $this->reportViewerUser = $this->createUser([
       'administer site configuration',
       'access administration pages',
+      'administer blocks',
     ]);
     $this->checkerRunnerUser = $this->createUser([
       'administer site configuration',
@@ -80,6 +82,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
       'access administration pages',
       'access site in maintenance mode',
       'administer modules',
+      'administer blocks',
     ]);
     $this->drupalLogin($this->reportViewerUser);
   }
@@ -100,18 +103,19 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     $page = $this->getSession()->getPage();
     $page->checkField('modules[automatic_updates][enable]');
     $page->pressButton('Install');
-
+    // CORE_MR_ONLY:// Confirm installing the experimental module.
+    // CORE_MR_ONLY:$page->pressButton('Continue');
     // Cron Updates will always be disabled on installation as per
     // automatic_updates.settings.yml .
     $session = $this->assertSession();
-    $session->pageTextNotContains($expected_result->getMessages()[0]);
+    $session->pageTextNotContains($expected_result->messages[0]->render());
     $session->linkExists('See status report for more details.');
   }
 
   /**
    * Provides data for testModuleFormInstallDisplay.
    */
-  public function providerTestModuleFormInstallDisplay(): array {
+  public static function providerTestModuleFormInstallDisplay(): array {
     return [
       'Error' => [
         SystemManager::REQUIREMENT_ERROR,
@@ -127,11 +131,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
    */
   public function testStatusChecksOnStatusReport(): void {
     $assert = $this->assertSession();
-
-    // Ensure automated_cron is disabled before installing automatic_updates.
-    // This ensures we are testing that automatic_updates runs the checkers when
-    // the module itself is installed and they weren't run on cron.
-    $this->assertFalse($this->container->get('module_handler')->moduleExists('automated_cron'));
+    $page = $this->getSession()->getPage();
     $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test']);
 
     // If the site is ready for updates, the users will see the same output
@@ -146,8 +146,6 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
 
     // Confirm a user without the permission to run status checks does not
     // have a link to run the checks when the checks need to be run again.
-    // @todo Change this to fake the request time in
-    //   https://www.drupal.org/node/3113971.
     /** @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface $key_value */
     $key_value = $this->container->get('keyvalue.expirable')->get('automatic_updates');
     $key_value->delete('status_check_last_run');
@@ -181,56 +179,55 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     $assert->pageTextMatchesCount(2, '/' . preg_quote(static::$errorsExplanation) . '/');
     $this->assertErrors($expected_results, TRUE);
 
-    // @todo Should we always show when the checks were last run and a link to
-    //   run when there is an error?
     // Confirm a user without permission to run the checks sees the same error.
     $this->drupalLogin($this->reportViewerUser);
     $this->drupalGet('admin/reports/status');
     $this->assertErrors($expected_results);
+
+    $this->drupalLogin($this->checkerRunnerUser);
+    $this->drupalGet('/admin/reports/status');
 
     $expected_results = [
       'error' => $this->createValidationResult(SystemManager::REQUIREMENT_ERROR),
       'warning' => $this->createValidationResult(SystemManager::REQUIREMENT_WARNING),
     ];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    // Confirm a new message is displayed if the page is reloaded.
-    $this->getSession()->reload();
-    // On the status page, we should see the summaries and messages, even if
-    // there is only 1 message.
-    $this->assertErrors([$expected_results['error']]);
-    $this->assertWarnings([$expected_results['warning']]);
+    $page->clickLink('Rerun readiness checks');
+    // We should see the summaries and messages, even if there's only 1 message.
+    $this->assertErrors([$expected_results['error']], TRUE);
+    $this->assertWarnings([$expected_results['warning']], TRUE);
 
     // If there's a result with only one message, but no summary, ensure that
     // message is displayed.
     $result = ValidationResult::createError([t('A lone message, with no summary.')]);
     TestSubscriber1::setTestResult([$result], StatusCheckEvent::class);
-    $this->getSession()->reload();
-    $this->assertErrors([$result]);
+    $page->clickLink('Rerun readiness checks');
+    $this->assertErrors([$result], TRUE);
 
     $expected_results = [
       'error' => $this->createValidationResult(SystemManager::REQUIREMENT_ERROR, 2),
       'warning' => $this->createValidationResult(SystemManager::REQUIREMENT_WARNING, 2),
     ];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->getSession()->reload();
-    // Confirm that both messages and summaries will be displayed on status
-    // report when there multiple messages.
-    $this->assertErrors([$expected_results['error']]);
-    $this->assertWarnings([$expected_results['warning']]);
+    $page->clickLink('Rerun readiness checks');
+    // Confirm that both messages and summaries will be displayed when there are
+    // multiple messages.
+    $this->assertErrors([$expected_results['error']], TRUE);
+    $this->assertWarnings([$expected_results['warning']], TRUE);
 
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_WARNING, 2)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->getSession()->reload();
+    $page->clickLink('Rerun readiness checks');
     $assert->pageTextContainsOnce('Update readiness checks');
     // Confirm that warnings will display on the status report if there are no
     // errors.
-    $this->assertWarnings($expected_results);
+    $this->assertWarnings($expected_results, TRUE);
 
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_WARNING)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->getSession()->reload();
+    $page->clickLink('Rerun readiness checks');
     $assert->pageTextContainsOnce('Update readiness checks');
-    $this->assertWarnings($expected_results);
+    $this->assertWarnings($expected_results, TRUE);
   }
 
   /**
@@ -244,7 +241,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
    * @return string[][]
    *   The test cases.
    */
-  public function providerAdminRoutes(): array {
+  public static function providerAdminRoutes(): array {
     return [
       'Structure Page' => ['system.admin_structure'],
       'Update settings Page' => ['update.settings'],
@@ -252,7 +249,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
   }
 
   /**
-   * Tests status check results on admin pages..
+   * Tests status check results on admin pages.
    *
    * @param string $admin_route
    *   The admin route to check.
@@ -261,12 +258,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
    */
   public function testStatusChecksOnAdminPages(string $admin_route): void {
     $assert = $this->assertSession();
-    $messages_section_selector = '[data-drupal-messages]';
 
-    // Ensure automated_cron is disabled before installing automatic_updates. This
-    // ensures we are testing that automatic_updates runs the checkers when the
-    // module itself is installed and they weren't run on cron.
-    $this->assertFalse($this->container->get('module_handler')->moduleExists('automated_cron'));
     $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test']);
 
     // If site is ready for updates no message will be displayed on admin pages.
@@ -274,120 +266,112 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     $this->drupalGet('admin/reports/status');
     $this->assertNoErrors();
     $this->drupalGet(Url::fromRoute($admin_route));
-    $assert->elementNotExists('css', $messages_section_selector);
+
+    $assert->statusMessageNotExists();
 
     // Confirm a user without the permission to run status checks does not have
     // a link to run the checks when the checks need to be run again.
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    // @todo Change this to use ::delayRequestTime() to simulate running cron
-    //   after a 24 wait instead of directly deleting 'status_check_last_run'
-    //   https://www.drupal.org/node/3113971.
     /** @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface $key_value */
     $key_value = $this->container->get('keyvalue.expirable')->get('automatic_updates');
     $key_value->delete('status_check_last_run');
     // A user without the permission to run the checkers will not see a message
     // on other pages if the checkers need to be run again.
     $this->drupalGet(Url::fromRoute($admin_route));
-    $assert->elementNotExists('css', $messages_section_selector);
+    $assert->statusMessageNotExists();
 
     // Confirm that a user with the correct permission can also run the checkers
     // on another admin page.
     $this->drupalLogin($this->checkerRunnerUser);
     $this->drupalGet(Url::fromRoute($admin_route));
-    $assert->elementExists('css', $messages_section_selector);
-    $assert->pageTextContainsOnce('Your site has not recently run an update readiness check. Rerun readiness checks now.');
+    $assert->statusMessageContains('Your site has not recently run an update readiness check. Rerun readiness checks now.');
     $this->clickLink('Rerun readiness checks now.');
     $assert->addressEquals(Url::fromRoute($admin_route));
-    $assert->pageTextContainsOnce($expected_results[0]->getSummary());
+    $assert->pageTextContainsOnce((string) $expected_results[0]->summary);
 
     $expected_results = [
       '1 error' => $this->createValidationResult(SystemManager::REQUIREMENT_ERROR),
       '1 warning' => $this->createValidationResult(SystemManager::REQUIREMENT_WARNING),
     ];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    // Confirm a new message is displayed if the cron is run after an hour.
-    $this->delayRequestTime();
-    $this->cronRun();
+    $this->runStatusChecks();
     $this->drupalGet(Url::fromRoute($admin_route));
     $assert->pageTextContainsOnce(static::$errorsExplanation);
     // Confirm on admin pages that the summary will be displayed.
-    $this->assertSame(SystemManager::REQUIREMENT_ERROR, $expected_results['1 error']->getSeverity());
-    $assert->pageTextContainsOnce((string) $expected_results['1 error']->getSummary());
-    $assert->pageTextNotContains($expected_results['1 error']->getMessages()[0]);
+    $this->assertSame(SystemManager::REQUIREMENT_ERROR, $expected_results['1 error']->severity);
+    $assert->pageTextContainsOnce((string) $expected_results['1 error']->summary);
+    $assert->pageTextNotContains($expected_results['1 error']->messages[0]->render());
     // Warnings are not displayed on admin pages if there are any errors.
-    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results['1 warning']->getSeverity());
-    $assert->pageTextNotContains($expected_results['1 warning']->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results['1 warning']->getSummary());
+    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results['1 warning']->severity);
+    $assert->pageTextNotContains($expected_results['1 warning']->messages[0]->render());
+    $assert->pageTextNotContains($expected_results['1 warning']->summary->render());
 
-    // Confirm that if cron runs less than hour after it previously ran it will
-    // not run the checkers again.
+    // Confirm the status check event is not dispatched on every admin page
+    // load.
     $unexpected_results = [
       '2 errors' => $this->createValidationResult(SystemManager::REQUIREMENT_ERROR, 2),
       '2 warnings' => $this->createValidationResult(SystemManager::REQUIREMENT_WARNING, 2),
     ];
     TestSubscriber1::setTestResult($unexpected_results, StatusCheckEvent::class);
-    $this->delayRequestTime(30);
-    $this->cronRun();
     $this->drupalGet(Url::fromRoute($admin_route));
-    $assert->pageTextNotContains($unexpected_results['2 errors']->getSummary());
-    $assert->pageTextContainsOnce((string) $expected_results['1 error']->getSummary());
-    $assert->pageTextNotContains($unexpected_results['2 warnings']->getSummary());
-    $assert->pageTextNotContains($expected_results['1 warning']->getMessages()[0]);
+    $assert->pageTextNotContains($unexpected_results['2 errors']->summary->render());
+    $assert->pageTextContainsOnce((string) $expected_results['1 error']->summary->render());
+    $assert->pageTextNotContains($unexpected_results['2 warnings']->summary->render());
+    $assert->pageTextNotContains($expected_results['1 warning']->messages[0]->render());
 
-    // Confirm that is if cron is run over an hour after the checkers were
-    // previously run the checkers will be run again.
-    $this->delayRequestTime(31);
-    $this->cronRun();
+    // Confirm the updated results will be shown when status checks are run
+    // again.
+    $this->runStatusChecks();
     $expected_results = $unexpected_results;
     $this->drupalGet(Url::fromRoute($admin_route));
     // Confirm on admin pages only the error summary will be displayed if there
     // is more than 1 error.
-    $this->assertSame(SystemManager::REQUIREMENT_ERROR, $expected_results['2 errors']->getSeverity());
-    $assert->pageTextNotContains($expected_results['2 errors']->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results['2 errors']->getMessages()[1]);
-    $assert->pageTextContainsOnce($expected_results['2 errors']->getSummary());
+    $this->assertSame(SystemManager::REQUIREMENT_ERROR, $expected_results['2 errors']->severity);
+    $assert->pageTextNotContains($expected_results['2 errors']->messages[0]->render());
+    $assert->pageTextNotContains($expected_results['2 errors']->messages[1]->render());
+    $assert->pageTextContainsOnce($expected_results['2 errors']->summary->render());
     $assert->pageTextContainsOnce(static::$errorsExplanation);
     // Warnings are not displayed on admin pages if there are any errors.
-    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results['2 warnings']->getSeverity());
-    $assert->pageTextNotContains($expected_results['2 warnings']->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results['2 warnings']->getMessages()[1]);
-    $assert->pageTextNotContains($expected_results['2 warnings']->getSummary());
+    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results['2 warnings']->severity);
+    $assert->pageTextNotContains($expected_results['2 warnings']->messages[0]->render());
+    $assert->pageTextNotContains($expected_results['2 warnings']->messages[1]->render());
+    $assert->pageTextNotContains($expected_results['2 warnings']->summary->render());
 
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_WARNING, 2)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->delayRequestTime();
-    $this->cronRun();
+    $this->runStatusChecks();
     $this->drupalGet(Url::fromRoute($admin_route));
     // Confirm that the warnings summary is displayed on admin pages if there
     // are no errors.
     $assert->pageTextNotContains(static::$errorsExplanation);
-    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results[0]->getSeverity());
-    $assert->pageTextNotContains($expected_results[0]->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results[0]->getMessages()[1]);
+    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results[0]->severity);
+    $assert->pageTextNotContains($expected_results[0]->messages[0]->render());
+    $assert->pageTextNotContains($expected_results[0]->messages[1]->render());
     $assert->pageTextContainsOnce(static::$warningsExplanation);
-    $assert->pageTextContainsOnce($expected_results[0]->getSummary());
+    $assert->pageTextContainsOnce($expected_results[0]->summary->render());
 
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_WARNING)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->delayRequestTime();
-    $this->cronRun();
+    $this->runStatusChecks();
     $this->drupalGet(Url::fromRoute($admin_route));
     $assert->pageTextNotContains(static::$errorsExplanation);
     // Confirm that a single warning is displayed and not the summary on admin
     // pages if there is only 1 warning and there are no errors.
-    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results[0]->getSeverity());
+    $this->assertSame(SystemManager::REQUIREMENT_WARNING, $expected_results[0]->severity);
     $assert->pageTextContainsOnce(static::$warningsExplanation);
-    $assert->pageTextContainsOnce((string) $expected_results[0]->getSummary());
-    $assert->pageTextNotContains($expected_results[0]->getMessages()[0]);
+    $assert->pageTextContainsOnce((string) $expected_results[0]->summary->render());
+    $assert->pageTextNotContains($expected_results[0]->messages[0]->render());
 
     // Confirm status check messages are not displayed when cron updates are
     // disabled.
-    $this->config('automatic_updates.settings')->set('cron', CronUpdater::DISABLED)->save();
+    $this->config('automatic_updates.settings')
+      ->set('unattended.level', CronUpdateRunner::DISABLED)
+      ->save();
     $this->drupalGet('admin/structure');
     $this->checkForMetaRefresh();
     $assert->pageTextNotContains(static::$warningsExplanation);
-    $assert->pageTextNotContains($expected_results[0]->getMessages()[0]);
+    $assert->pageTextNotContains($expected_results[0]->messages[0]->render());
   }
 
   /**
@@ -405,15 +389,17 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // the functionality to retrieve our fake release history metadata.
     $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test']);
     // @todo Remove in https://www.drupal.org/project/automatic_updates/issues/3284443
-    $this->config('automatic_updates.settings')->set('cron', CronUpdater::SECURITY)->save();
+    $this->config('automatic_updates.settings')
+      ->set('unattended.level', CronUpdateRunner::SECURITY)
+      ->save();
     $this->drupalGet('admin/reports/status');
     $this->assertNoErrors(TRUE);
 
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber2::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->container->get('module_installer')->install(['automatic_updates_test2']);
+    $this->container->get('module_installer')->install(['automatic_updates_test_status_checker']);
     $this->drupalGet('admin/structure');
-    $assert->pageTextContainsOnce((string) $expected_results[0]->getSummary());
+    $assert->pageTextContainsOnce((string) $expected_results[0]->summary->render());
 
     // Confirm that installing a module runs the checkers, even if the new
     // module does not provide any validators.
@@ -428,9 +414,9 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // because validators will be run if needed on the status report.
     $this->drupalGet('admin/structure');
     // Confirm that new checker messages are displayed.
-    $assert->pageTextNotContains($previous_results[0]->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results['2 errors']->getMessages()[0]);
-    $assert->pageTextContainsOnce($expected_results['2 errors']->getSummary());
+    $assert->pageTextNotContains($previous_results[0]->messages[0]->render());
+    $assert->pageTextNotContains($expected_results['2 errors']->messages[0]->render());
+    $assert->pageTextContainsOnce($expected_results['2 errors']->summary->render());
   }
 
   /**
@@ -447,27 +433,27 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     $this->container->get('module_installer')->install([
       'automatic_updates',
       'automatic_updates_test',
-      'automatic_updates_test2',
+      'automatic_updates_test_status_checker',
     ]);
     // Check for message on 'admin/structure' instead of the status report
     // because checkers will be run if needed on the status report.
     $this->drupalGet('admin/structure');
-    $assert->pageTextContainsOnce($expected_results_1[0]->getSummary());
-    $assert->pageTextContainsOnce($expected_results_2[0]->getSummary());
+    $assert->pageTextContainsOnce($expected_results_1[0]->summary->render());
+    $assert->pageTextContainsOnce($expected_results_2[0]->summary->render());
 
     // Confirm that when on of the module is uninstalled the other module's
     // checker result is still displayed.
-    $this->container->get('module_installer')->uninstall(['automatic_updates_test2']);
+    $this->container->get('module_installer')->uninstall(['automatic_updates_test_status_checker']);
     $this->drupalGet('admin/structure');
-    $assert->pageTextNotContains($expected_results_2[0]->getSummary());
-    $assert->pageTextContainsOnce($expected_results_1[0]->getSummary());
+    $assert->pageTextNotContains($expected_results_2[0]->summary->render());
+    $assert->pageTextContainsOnce($expected_results_1[0]->summary->render());
 
     // Confirm that when on of the module is uninstalled the other module's
     // checker result is still displayed.
     $this->container->get('module_installer')->uninstall(['automatic_updates_test']);
     $this->drupalGet('admin/structure');
-    $assert->pageTextNotContains($expected_results_2[0]->getMessages()[0]);
-    $assert->pageTextNotContains($expected_results_1[0]->getMessages()[0]);
+    $assert->pageTextNotContains($expected_results_2[0]->messages[0]->render());
+    $assert->pageTextNotContains($expected_results_1[0]->messages[0]->render());
   }
 
   /**
@@ -487,7 +473,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // area.
     $results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($results, StatusCheckEvent::class);
-    $message = $results[0]->getSummary();
+    $message = $results[0]->summary;
 
     $this->container->get('module_installer')->install([
       'automatic_updates',
@@ -497,10 +483,10 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // The error should be persistently visible, even after the checker stops
     // flagging it.
     $this->drupalGet('/admin/structure');
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
     TestSubscriber1::setTestResult(NULL, StatusCheckEvent::class);
     $this->getSession()->reload();
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
 
     // Do the update; we don't expect any errors or special conditions to appear
     // during it. The Update button is displayed because the form does its own
@@ -512,7 +498,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // page, to confirm that the updater form is not discarding the previous
     // results by doing its checks.
     $this->drupalGet('/admin/structure');
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
     // Proceed with the update.
     $this->drupalGet('/admin/modules/update');
     $page->pressButton('Update to 9.8.1');
@@ -524,7 +510,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
 
     // The warning should not be visible anymore.
     $this->drupalGet('/admin/structure');
-    $assert_session->pageTextNotContains($message);
+    $assert_session->pageTextNotContains($message->render());
   }
 
   /**
@@ -537,7 +523,7 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // area.
     $result = $this->createValidationResult(SystemManager::REQUIREMENT_ERROR);
     TestSubscriber1::setTestResult([$result], StatusCheckEvent::class);
-    $message = $result->getSummary();
+    $message = $result->summary;
 
     $this->container->get('module_installer')->install([
       'automatic_updates',
@@ -549,22 +535,22 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // flagging it.
     $this->drupalGet('/admin/structure');
     $assert_session = $this->assertSession();
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
     TestSubscriber1::setTestResult(NULL, StatusCheckEvent::class);
     $session = $this->getSession();
     $session->reload();
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
 
     $config = $this->config('automatic_updates.settings');
     // If we disable notifications, stored results should not be cleared.
     $config->set('status_check_mail', StatusCheckMailer::DISABLED)->save();
     $session->reload();
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
 
     // If we re-enable them, though, they should be cleared.
     $config->set('status_check_mail', StatusCheckMailer::ERRORS_ONLY)->save();
     $session->reload();
-    $assert_session->pageTextNotContains($message);
+    $assert_session->pageTextNotContains($message->render());
     $no_results_message = 'Your site has not recently run an update readiness check.';
     $assert_session->pageTextContains($no_results_message);
 
@@ -573,11 +559,82 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     TestSubscriber1::setTestResult([$result], StatusCheckEvent::class);
     $session->getPage()->clickLink('Rerun readiness checks now');
     $this->drupalGet('/admin/structure');
-    $assert_session->pageTextContains($message);
+    $assert_session->pageTextContains($message->render());
     $config->set('status_check_mail', StatusCheckMailer::ALL)->save();
     $session->reload();
-    $assert_session->pageTextNotContains($message);
+    $assert_session->pageTextNotContains($message->render());
     $assert_session->pageTextContains($no_results_message);
+  }
+
+  /**
+   * Tests that the status report shows cached status check results.
+   */
+  public function testStatusReportShowsCachedResults(): void {
+    $session = $this->getSession();
+    $this->drupalLogin($this->checkerRunnerUser);
+
+    $this->container->get('module_installer')->install([
+      'automatic_updates',
+      'automatic_updates_test',
+    ]);
+    $this->container = $this->container->get('kernel')->getContainer();
+
+    // Clear stored results that were collected when the module was installed.
+    $this->container->get(StatusChecker::class)->clearStoredResults();
+
+    // Flag a validation error, whose summary will be displayed in the messages
+    // area.
+    $result = $this->createValidationResult(SystemManager::REQUIREMENT_ERROR);
+    TestSubscriber1::setTestResult([$result], StatusCheckEvent::class);
+
+    $this->drupalGet('/admin/reports/status');
+    $this->assertErrors([$result], TRUE);
+
+    // Clear the result, and ensure that it's still visible because it is
+    // cached.
+    TestSubscriber::setTestResult(NULL, StatusCheckEvent::class);
+    $session->reload();
+    $this->assertErrors([$result], TRUE);
+
+    // If unattended updates are configured to run via the command line, we
+    // should see a warning that the status checks have not run recently. This
+    // is because changing the configuration clears the cached results, since
+    // they may be affected by the change.
+    // @see \Drupal\automatic_updates\Validation\StatusChecker::onConfigSave()
+    $this->config('automatic_updates.settings')
+      ->set('unattended.method', 'console')
+      ->save();
+    $session->reload();
+    $assert_session = $this->assertSession();
+    $assert_session->pageTextContainsOnce('Unattended updates are configured to run via the console, but do not appear to have run recently.');
+    $assert_session->pageTextNotContains((string) $result->messages[0]->render());
+  }
+
+  /**
+   * Tests the status checks when unattended updates are run via the console.
+   */
+  public function testUnattendedUpdatesRunFromConsole(): void {
+    $this->container->get('module_installer')->install(['automatic_updates']);
+    $this->container = $this->container->get('kernel')->getContainer();
+
+    // Clear stored results that were collected when the module was installed.
+    $this->container->get(StatusChecker::class)->clearStoredResults();
+
+    $this->config('automatic_updates.settings')
+      ->set('unattended.method', 'console')
+      ->save();
+
+    // If we visit the status report, we should see an error requirement because
+    // unattended updates are configured to run via the terminal, and there are
+    // no stored status check results, which means that the console command has
+    // probably not run recently (or ever).
+    $this->drupalGet('/admin/reports/status');
+    $this->assertRequirement('error', 'Unattended updates are configured to run via the console, but do not appear to have run recently.', [], FALSE);
+
+    // We should see a similar message on any other admin page.
+    $this->drupalGet('/admin/structure');
+    $this->assertSession()
+      ->statusMessageContains('Unattended updates are configured to run via the console, but not appear to have run recently.', 'error');
   }
 
   /**
@@ -647,8 +704,8 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
     // Convert the expected results into strings.
     $expected_messages = [];
     foreach ($expected_results as $result) {
-      $messages = $result->getMessages();
-      $summary = $result->getSummary();
+      $messages = $result->messages;
+      $summary = $result->summary;
       if ($summary) {
         $expected_messages[] = $summary;
       }
@@ -693,15 +750,11 @@ class StatusCheckTest extends AutomaticUpdatesFunctionalTestBase {
   }
 
   /**
-   * Delays the request for the test.
-   *
-   * @param int $minutes
-   *   The number of minutes to delay request time. Defaults to 61 minutes.
+   * Runs status checks.
    */
-  private function delayRequestTime(int $minutes = 61): void {
-    static $total_delay = 0;
-    $total_delay += $minutes;
-    TestTime::setFakeTimeByOffset("+$total_delay minutes");
+  private function runStatusChecks(): void {
+    $this->drupalGet('/admin/reports/status');
+    $this->clickLink('Rerun readiness checks');
   }
 
 }

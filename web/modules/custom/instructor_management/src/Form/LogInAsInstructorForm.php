@@ -6,11 +6,26 @@ namespace Drupal\instructor_management\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\user\Entity\User;
+use Drupal\user\UserAuthInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * Provides a Instructor management form.
  */
 final class LogInAsInstructorForm extends FormBase {
+
+  protected $userAuth;
+
+  public function __construct(UserAuthInterface $user_auth) {
+    $this->userAuth = $user_auth;
+  }
+
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('user.auth')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -22,24 +37,24 @@ final class LogInAsInstructorForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state): array {
-
-    $form['message'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Message'),
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    $form['name'] = [
+      '#type' => 'textfield',
+      '#title' => $this->t('Username'),
       '#required' => TRUE,
     ];
-
-    $form['actions'] = [
-      '#type' => 'actions',
-      'submit' => [
-        '#type' => 'submit',
-        '#value' => $this->t('Send'),
-      ],
+    $form['pass'] = [
+      '#type' => 'password',
+      '#title' => $this->t('Password'),
+      '#required' => TRUE,
     ];
-
+    $form['actions']['submit'] = [
+      '#type' => 'submit',
+      '#value' => $this->t('Log in'),
+    ];
     return $form;
   }
+
 
   /**
    * {@inheritdoc}
@@ -60,9 +75,20 @@ final class LogInAsInstructorForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, FormStateInterface $form_state): void {
-    $this->messenger()->addStatus($this->t('The message has been sent.'));
-    $form_state->setRedirect('<front>');
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $name = $form_state->getValue('name');
+    $pass = $form_state->getValue('pass');
+    $uid = $this->userAuth->authenticate($name, $pass);
+    if ($uid) {
+      $user = User::load($uid);
+      if ($user->hasRole('instructor')) {
+        user_login_finalize($user);
+        $form_state->setRedirect('entity.user.canonical', ['user' => $uid]);
+      } else {
+        $this->messenger()->addError($this->t('The user is not an instructor.'));
+      }
+    } else {
+      $this->messenger()->addError($this->t('User with these credentials is not registered.'));
+    }
   }
-
 }

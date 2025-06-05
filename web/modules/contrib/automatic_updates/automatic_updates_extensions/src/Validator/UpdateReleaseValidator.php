@@ -1,11 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates_extensions\Validator;
 
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ProjectInfo;
-use Drupal\automatic_updates_extensions\ExtensionUpdater;
 use Drupal\package_manager\LegacyVersionUtility;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\package_manager\Event\PreCreateEvent;
@@ -18,11 +19,17 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *   This class is an internal part of the module's update handling and
  *   should not be used by external code.
  *
- * @todo Remove this validator completely in https://www.drupal.org/i/3307369.
+ * @todo Decide if this validator can be removed completely in
+ *    https://www.drupal.org/i/3351091.
  */
 final class UpdateReleaseValidator implements EventSubscriberInterface {
 
   use StringTranslationTrait;
+
+  public function __construct(
+    private readonly ComposerInspector $composerInspector,
+    private readonly PathLocator $pathLocator,
+  ) {}
 
   /**
    * Checks if the given version of a project is supported.
@@ -41,7 +48,7 @@ final class UpdateReleaseValidator implements EventSubscriberInterface {
    *   TRUE if the given version of the project is supported, otherwise FALSE.
    *   given version is not supported will return FALSE.
    */
-  protected function isSupportedRelease(string $name, string $semantic_version): bool {
+  private function isSupportedRelease(string $name, string $semantic_version): bool {
     $supported_releases = (new ProjectInfo($name))->getInstallableReleases();
     if (!$supported_releases) {
       return FALSE;
@@ -71,17 +78,18 @@ final class UpdateReleaseValidator implements EventSubscriberInterface {
    *   The event object.
    */
   public function checkRelease(PreCreateEvent $event): void {
-    $stage = $event->getStage();
+    $stage = $event->stage;
     // This check only works with Automatic Updates Extensions.
-    if (!$stage instanceof ExtensionUpdater) {
+    if ($stage->getType() !== 'automatic_updates_extensions:attended') {
       return;
     }
 
+    $active_packages = $this->composerInspector->getInstalledPackagesList($this->pathLocator->getProjectRoot());
     $all_versions = $stage->getPackageVersions();
     $messages = [];
     foreach (['production', 'dev'] as $package_type) {
       foreach ($all_versions[$package_type] as $package_name => $sematic_version) {
-        $project_name = $stage->getActiveComposer()->getProjectForPackage($package_name);
+        $project_name = $active_packages[$package_name]->getProjectName();
         // If the version isn't in the list of installable releases, then it
         // isn't secure and supported and the user should receive an error.
         if (!$this->isSupportedRelease($project_name, $sematic_version)) {

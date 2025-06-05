@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -20,7 +20,7 @@ class UpdateCompleteMessageTest extends UpdaterFormTestBase {
    * @return string[][]
    *   The test cases.
    */
-  public function providerUpdateCompleteMessage(): array {
+  public static function providerUpdateCompleteMessage(): array {
     return [
       'maintenance mode off' => [FALSE],
       'maintenance mode on' => [TRUE],
@@ -44,7 +44,7 @@ class UpdateCompleteMessageTest extends UpdaterFormTestBase {
     $state->set('system.maintenance_mode', $maintenance_mode_on);
     $page = $this->getSession()->getPage();
 
-    $this->drupalGet('/admin/modules/automatic-update');
+    $this->drupalGet('/admin/modules/update');
     $page->pressButton('Update to 9.8.1');
     $this->checkForMetaRefresh();
     // Confirm that the site was put into maintenance mode if needed.

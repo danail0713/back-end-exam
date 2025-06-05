@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Traits;
 
@@ -8,7 +8,7 @@ use Drupal\Core\Test\AssertMailTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 
 /**
- * Contains helper methods for testing e-mail sent by Automatic Updates.
+ * Contains helper methods for testing email sent by Automatic Updates.
  *
  * @internal
  */
@@ -30,7 +30,7 @@ trait EmailNotificationsTestTrait {
   protected $emailRecipients = [];
 
   /**
-   * Prepares the recipient list for e-mails related to Automatic Updates.
+   * Prepares the recipient list for emails related to Automatic Updates.
    */
   protected function setUpEmailRecipients(): void {
     // First, create a user whose preferred language is different from the
@@ -56,40 +56,40 @@ trait EmailNotificationsTestTrait {
   /**
    * Asserts that all recipients received a given email.
    *
-   * @param string $subject
+   * @param string $expected_subject
    *   The subject line of the email that should have been sent.
-   * @param string $body
+   * @param string $expected_body
    *   The beginning of the body text of the email that should have been sent.
    *
    * @see ::$emailRecipients
    */
-  protected function assertMessagesSent(string $subject, string $body): void {
+  protected function assertMessagesSent(string $expected_subject, string $expected_body): void {
     $sent_messages = $this->getMails([
-      'subject' => $subject,
+      'subject' => $expected_subject,
     ]);
     $this->assertNotEmpty($sent_messages);
-    $this->assertSame(count($this->emailRecipients), count($sent_messages));
+    $this->assertCount(count($this->emailRecipients), $sent_messages);
 
     // Ensure the body is formatted the way the PHP mailer would do it.
-    $message = [
-      'body' => [$body],
+    $expected_message = [
+      'body' => [$expected_body],
     ];
-    $message = $this->container->get('plugin.manager.mail')
+    $expected_message = $this->container->get('plugin.manager.mail')
       ->createInstance('php_mail')
-      ->format($message);
-    $body = $message['body'];
+      ->format($expected_message);
+    $expected_body = $expected_message['body'];
 
-    foreach ($sent_messages as $message) {
-      $email = $message['to'];
+    foreach ($sent_messages as $sent_message) {
+      $email = $sent_message['to'];
       $expected_langcode = $this->emailRecipients[$email];
 
-      $this->assertSame($expected_langcode, $message['langcode']);
+      $this->assertSame($expected_langcode, $sent_message['langcode']);
       // The message, and every line in it, should have been sent in the
       // expected language.
       // @see automatic_updates_test_mail_alter()
-      $this->assertArrayHasKey('line_langcodes', $message);
-      $this->assertSame([$expected_langcode], $message['line_langcodes']);
-      $this->assertStringStartsWith($body, $message['body']);
+      $this->assertArrayHasKey('line_langcodes', $sent_message);
+      $this->assertSame([$expected_langcode], $sent_message['line_langcodes']);
+      $this->assertStringStartsWith($expected_body, $sent_message['body']);
     }
   }
 

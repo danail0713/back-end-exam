@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Event;
 
-use Drupal\package_manager\Stage;
+use Drupal\package_manager\StageBase;
 use Symfony\Contracts\EventDispatcher\Event;
 
 /**
@@ -13,30 +13,12 @@ use Symfony\Contracts\EventDispatcher\Event;
 abstract class StageEvent extends Event {
 
   /**
-   * The stage which fired this event.
-   *
-   * @var \Drupal\package_manager\Stage
-   */
-  protected $stage;
-
-  /**
    * Constructs a StageEvent object.
    *
-   * @param \Drupal\package_manager\Stage $stage
+   * @param \Drupal\package_manager\StageBase $stage
    *   The stage which fired this event.
    */
-  public function __construct(Stage $stage) {
-    $this->stage = $stage;
-  }
-
-  /**
-   * Returns the stage which fired this event.
-   *
-   * @return \Drupal\package_manager\Stage
-   *   The stage which fired this event.
-   */
-  public function getStage(): Stage {
-    return $this->stage;
+  public function __construct(public readonly StageBase $stage) {
   }
 
 }

@@ -1,37 +1,20 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
+use Drupal\Component\Assertion\Inspector;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\system\SystemManager;
+use PhpTuf\ComposerStager\API\Exception\ExceptionInterface;
 
 /**
  * A value object to contain the results of a validation.
+ *
+ * @property \Drupal\Core\StringTranslation\TranslatableMarkup[] $messages
  */
 final class ValidationResult {
-
-  /**
-   * A succinct summary of the results.
-   *
-   * @var \Drupal\Core\StringTranslation\TranslatableMarkup
-   */
-  protected $summary;
-
-  /**
-   * The error messages.
-   *
-   * @var \Drupal\Core\StringTranslation\TranslatableMarkup[]|string[]
-   */
-  protected $messages;
-
-  /**
-   * The severity of the result.
-   *
-   * @var int
-   */
-  protected $severity;
 
   /**
    * Creates a ValidationResult object.
@@ -40,20 +23,43 @@ final class ValidationResult {
    *   The severity of the result. Should be one of the
    *   SystemManager::REQUIREMENT_* constants.
    * @param \Drupal\Core\StringTranslation\TranslatableMarkup[]|string[] $messages
-   *   The error messages.
+   *   The result messages.
    * @param \Drupal\Core\StringTranslation\TranslatableMarkup|null $summary
-   *   The errors summary.
+   *   A succinct summary of the result.
+   * @param bool $assert_translatable
+   *   Whether to assert the messages are translatable. Internal use only.
+   *
+   * @throws \InvalidArgumentException
+   *   Thrown if $messages is empty, or if it has 2 or more items but $summary
+   *   is NULL.
    */
-  private function __construct(int $severity, array $messages, ?TranslatableMarkup $summary = NULL) {
+  private function __construct(
+    public readonly int $severity,
+    private array $messages,
+    public readonly ?TranslatableMarkup $summary,
+    bool $assert_translatable,
+  ) {
+    if ($assert_translatable) {
+      assert(Inspector::assertAll(fn ($message) => $message instanceof TranslatableMarkup, $messages));
+    }
     if (empty($messages)) {
       throw new \InvalidArgumentException('At least one message is required.');
     }
     if (count($messages) > 1 && !$summary) {
       throw new \InvalidArgumentException('If more than one message is provided, a summary is required.');
     }
-    $this->summary = $summary;
-    $this->messages = $messages;
-    $this->severity = $severity;
+  }
+
+  /**
+   * Implements magic ::__get() method.
+   */
+  public function __get(string $name): mixed {
+    return match ($name) {
+      // The messages must be private so that they cannot be mutated by external
+      // code, but we want to allow callers to access them in the same way as
+      // $this->summary and $this->severity.
+      'messages' => $this->messages,
+    };
   }
 
   /**
@@ -66,8 +72,11 @@ final class ValidationResult {
    *
    * @return static
    */
-  public static function createErrorFromThrowable(\Throwable $throwable, ?TranslatableMarkup $summary = NULL): self {
-    return new static(SystemManager::REQUIREMENT_ERROR, [$throwable->getMessage()], $summary);
+  public static function createErrorFromThrowable(\Throwable $throwable, ?TranslatableMarkup $summary = NULL): static {
+    // All Composer Stager exceptions are translatable.
+    $is_translatable = $throwable instanceof ExceptionInterface;
+    $message = $is_translatable ? $throwable->getTranslatableMessage() : $throwable->getMessage();
+    return new static(SystemManager::REQUIREMENT_ERROR, [$message], $summary, $is_translatable);
   }
 
   /**
@@ -80,8 +89,8 @@ final class ValidationResult {
    *
    * @return static
    */
-  public static function createError(array $messages, ?TranslatableMarkup $summary = NULL): self {
-    return new static(SystemManager::REQUIREMENT_ERROR, $messages, $summary);
+  public static function createError(array $messages, ?TranslatableMarkup $summary = NULL): static {
+    return new static(SystemManager::REQUIREMENT_ERROR, $messages, $summary, TRUE);
   }
 
   /**
@@ -94,39 +103,8 @@ final class ValidationResult {
    *
    * @return static
    */
-  public static function createWarning(array $messages, ?TranslatableMarkup $summary = NULL): self {
-    return new static(SystemManager::REQUIREMENT_WARNING, $messages, $summary);
-  }
-
-  /**
-   * Gets the summary.
-   *
-   * @return \Drupal\Core\StringTranslation\TranslatableMarkup|null
-   *   The summary.
-   */
-  public function getSummary(): ?TranslatableMarkup {
-    return $this->summary;
-  }
-
-  /**
-   * Gets the messages.
-   *
-   * @return \Drupal\Core\StringTranslation\TranslatableMarkup[]|string[]
-   *   The error or warning messages.
-   */
-  public function getMessages(): array {
-    return $this->messages;
-  }
-
-  /**
-   * The severity of the result.
-   *
-   * @return int
-   *   Either SystemManager::REQUIREMENT_ERROR or
-   *   SystemManager::REQUIREMENT_WARNING.
-   */
-  public function getSeverity(): int {
-    return $this->severity;
+  public static function createWarning(array $messages, ?TranslatableMarkup $summary = NULL): static {
+    return new static(SystemManager::REQUIREMENT_WARNING, $messages, $summary, TRUE);
   }
 
   /**
@@ -141,7 +119,7 @@ final class ValidationResult {
    */
   public static function getOverallSeverity(array $results): int {
     foreach ($results as $result) {
-      if ($result->getSeverity() === SystemManager::REQUIREMENT_ERROR) {
+      if ($result->severity === SystemManager::REQUIREMENT_ERROR) {
         return SystemManager::REQUIREMENT_ERROR;
       }
     }
@@ -163,9 +141,9 @@ final class ValidationResult {
    */
   public static function isEqual(self $a, self $b): bool {
     return (
-      $a->getSeverity() === $b->getSeverity() &&
-      strval($a->getSummary()) === strval($b->getSummary()) &&
-      array_map('strval', $a->getMessages()) === array_map('strval', $b->getMessages())
+      $a->severity === $b->severity &&
+      strval($a->summary) === strval($b->summary) &&
+      array_map('strval', $a->messages) === array_map('strval', $b->messages)
     );
   }
 

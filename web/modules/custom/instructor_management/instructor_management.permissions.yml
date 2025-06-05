@@ -1,0 +1,11 @@
+access add resources form:
+  title: 'Access add resource form'
+  description: 'Allows instructors to add resources to themes of their courses.'
+
+access add homework form:
+  title: 'Access add homework form'
+  description: 'Allows instructors to add homeworks to themes from their courses.'
+
+access view homeworks form:
+  title: 'Access view homeworks form'
+  description: 'Allows instructors to view all homeworks sent by students he/she teaches and to grade and write comments to the homeworks.'

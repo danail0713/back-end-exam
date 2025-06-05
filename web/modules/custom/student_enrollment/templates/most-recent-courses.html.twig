@@ -1,10 +1,10 @@
-<h2>Most recent courses</h2>
+<h2>{{ 'Most recent courses'|t }}</h2>
 {% if courses %}
 	{% for course in courses %}
-		<a href="{{url('entity.node.canonical',{'node': course.id})}}">
-			<h4>{{course.label}}</h4>
+		<a href="{{ url('entity.node.canonical', {'node': course.id}) }}">
+			<h4>{{ course.label }}</h4>
 		</a>
 	{% endfor %}
 {% else %}
-	<p>No courses found.</p>
+	<p>{{ 'No courses found.'|t }}</p>
 {% endif %}

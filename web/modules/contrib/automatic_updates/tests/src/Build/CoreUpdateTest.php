@@ -1,22 +1,21 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Build;
 
 use Behat\Mink\Element\DocumentElement;
-use Drupal\automatic_updates\CronUpdater;
-use Drupal\automatic_updates\Updater;
-use Drupal\Composer\Composer;
+use Drupal\automatic_updates\ConsoleUpdateStage;
+use Drupal\automatic_updates\UpdateStage;
 use Drupal\package_manager\Event\PostApplyEvent;
 use Drupal\package_manager\Event\PostCreateEvent;
-use Drupal\package_manager\Event\PostDestroyEvent;
 use Drupal\package_manager\Event\PostRequireEvent;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
-use Drupal\package_manager\Event\PreDestroyEvent;
 use Drupal\package_manager\Event\PreRequireEvent;
 use Drupal\Tests\WebAssert;
+use Symfony\Component\Process\PhpExecutableFinder;
+use Symfony\Component\Process\Process;
 
 /**
  * Tests an end-to-end update of Drupal core.
@@ -44,7 +43,7 @@ class CoreUpdateTest extends UpdateTestBase {
   /**
    * {@inheritdoc}
    */
-  public function copyCodebase(\Iterator $iterator = NULL, $working_dir = NULL): void {
+  public function copyCodebase(?\Iterator $iterator = NULL, $working_dir = NULL): void {
     parent::copyCodebase($iterator, $working_dir);
 
     // Ensure that we will install Drupal 9.8.0 (a fake version that should
@@ -99,9 +98,6 @@ class CoreUpdateTest extends UpdateTestBase {
       'projects' => [
         'drupal' => '9.8.1',
       ],
-      'files_to_return' => [
-        'web/core/lib/Drupal.php',
-      ],
     ]);
     // Ensure that the update is prevented if the web root and/or vendor
     // directories are not writable.
@@ -113,7 +109,7 @@ class CoreUpdateTest extends UpdateTestBase {
     $update_status_code = $session->getStatusCode();
     $file_contents = $session->getPage()->getContent();
     $this->assertExpectedStageEventsFired(
-      Updater::class,
+      UpdateStage::class,
       [
         // ::assertReadOnlyFileSystemError attempts to start an update
         // multiple times so 'PreCreateEvent' will be fired multiple times.
@@ -126,18 +122,45 @@ class CoreUpdateTest extends UpdateTestBase {
         PostRequireEvent::class,
         PreApplyEvent::class,
         PostApplyEvent::class,
-        PreDestroyEvent::class,
-        PostDestroyEvent::class,
       ],
-      'Error response: ' . $file_contents
+      message: 'Error response: ' . $file_contents
     );
     // Even though the response is what we expect, assert the status code as
     // well, to be extra-certain that there was no kind of server-side error.
     $this->assertSame(200, $update_status_code);
-    $file_contents = json_decode($file_contents, TRUE, 512, JSON_THROW_ON_ERROR);
 
-    $this->assertStringContainsString("const VERSION = '9.8.1';", $file_contents['web/core/lib/Drupal.php']);
+    $this->assertStringContainsString(
+      "const VERSION = '9.8.1';",
+      file_get_contents($this->getWebRoot() . '/core/lib/Drupal.php')
+    );
     $this->assertUpdateSuccessful('9.8.1');
+
+    $this->assertRequestedChangesWereLogged([
+      'Update drupal/core-dev from 9.8.0 to 9.8.1',
+      'Update drupal/core-recommended from 9.8.0 to 9.8.1',
+    ]);
+    $this->assertAppliedChangesWereLogged([
+      'Updated drupal/core from 9.8.0 to 9.8.1',
+      'Updated drupal/core-dev from 9.8.0 to 9.8.1',
+      'Updated drupal/core-recommended from 9.8.0 to 9.8.1',
+    ]);
+  }
+
+  /**
+   * Tests updating during cron using the Automated Cron module.
+   */
+  public function testAutomatedCron(): void {
+    $this->createTestProject('RecommendedProject');
+    $this->installModules(['automated_cron']);
+
+    // Reset the record of the last cron run.
+    $this->visit('/automatic-updates-test-api/reset-cron');
+    $this->getMink()->assertSession()->pageTextContains('cron reset');
+    // Make another request so that Automated Cron will be triggered at the end
+    // of the request.
+    $this->visit('/');
+    $this->assertExpectedStageEventsFired(ConsoleUpdateStage::class, wait: 360);
+    $this->assertCronUpdateSuccessful();
   }
 
   /**
@@ -153,10 +176,21 @@ class CoreUpdateTest extends UpdateTestBase {
     $this->coreUpdateTillUpdateReady($page);
     $page->pressButton('Continue');
     $this->waitForBatchJob();
+    $assert_session->addressEquals('/admin/reports/updates');
     $assert_session->pageTextContains('Update complete!');
-    $this->assertExpectedStageEventsFired(Updater::class);
+    $assert_session->pageTextContains('Up to date');
     $assert_session->pageTextNotContains('There is a security update available for your version of Drupal.');
+    $this->assertExpectedStageEventsFired(UpdateStage::class);
     $this->assertUpdateSuccessful('9.8.1');
+    $this->assertRequestedChangesWereLogged([
+      'Update drupal/core-dev from 9.8.0 to 9.8.1',
+      'Update drupal/core-recommended from 9.8.0 to 9.8.1',
+    ]);
+    $this->assertAppliedChangesWereLogged([
+      'Updated drupal/core from 9.8.0 to 9.8.1',
+      'Updated drupal/core-dev from 9.8.0 to 9.8.1',
+      'Updated drupal/core-recommended from 9.8.0 to 9.8.1',
+    ]);
   }
 
   /**
@@ -169,54 +203,14 @@ class CoreUpdateTest extends UpdateTestBase {
    */
   public function testCron(string $template): void {
     $this->createTestProject($template);
-    // Install dblog so we can check if any errors were logged during the update.
-    // This implies one can only retrieve log entries through the dblog UI. This
-    // seems non-ideal but it is the choice that requires least custom
-    // configuration or custom code. Using the `syslog` or `syslog_test` module
-    // or the `@RestResource=dblog` plugin for the `rest` module require
-    // more additional code than the inflexible log querying via
-    // `/admin/reports/dblog` below.
-    $this->installModules(['dblog']);
 
     $this->visit('/admin/reports/status');
-    $mink = $this->getMink();
-    $page = $mink->getSession()->getPage();
-    $assert_session = $mink->assertSession();
-    $page->clickLink('Run cron');
-    $cron_run_status_code = $mink->getSession()->getStatusCode();
-    $this->assertExpectedStageEventsFired(CronUpdater::class);
-    $this->assertSame(200, $cron_run_status_code);
+    $session = $this->getMink()->getSession();
 
-    // There should be log messages, but no errors or warnings should have been
-    // logged by Automatic Updates.
-    $this->visit('/admin/reports/dblog');
-    $assert_session->pageTextNotContains('No log messages available.');
-    $page->selectFieldOption('Type', 'automatic_updates');
-    $page->selectFieldOption('Severity', 'Emergency', TRUE);
-    $page->selectFieldOption('Severity', 'Alert', TRUE);
-    $page->selectFieldOption('Severity', 'Critical', TRUE);
-    $page->selectFieldOption('Severity', 'Warning', TRUE);
-    $page->pressButton('Filter');
-    $assert_session->pageTextContains('No log messages available.');
-
-    // Ensure that the update occurred.
-    $page->selectFieldOption('Severity', 'Info');
-    $page->pressButton('Filter');
-    $assert_session->elementsCount('css', '#admin-dblog tbody tr', 1);
-    $assert_session->elementTextContains('css', '#admin-dblog tr:nth-of-type(1) td:nth-of-type(4)', 'Drupal core has been updated from 9.8.0 to 9.8.1');
-    $this->assertUpdateSuccessful('9.8.1');
-    // \Drupal\automatic_updates\Routing\RouteSubscriber::alterRoutes() sets
-    // `_automatic_updates_status_messages: skip` on the route for the path
-    // `/admin/modules/reports/status`, but not on the `/admin/reports` path. So
-    // to test AdminStatusCheckMessages::displayAdminPageMessages(), another
-    // page must be visited. `/admin/reports` was chosen, but it could be
-    // another too.
-    $assert_session->addressEquals('/admin/reports/status');
-    $this->visit('/admin/reports');
-    $assert_session->statusCodeEquals(200);
-    // @see \Drupal\automatic_updates\Validation\AdminStatusCheckMessages::displayAdminPageMessages()
-    $this->webAssert->statusMessageNotExists('error');
-    $this->webAssert->statusMessageNotExists('warning');
+    $session->getPage()->clickLink('Run cron');
+    $this->assertSame(200, $session->getStatusCode());
+    $this->assertExpectedStageEventsFired(ConsoleUpdateStage::class, wait: 360);
+    $this->assertCronUpdateSuccessful();
   }
 
   /**
@@ -232,7 +226,18 @@ class CoreUpdateTest extends UpdateTestBase {
     $this->visit('/admin/reports/status');
     $assert_session->pageTextContains('Your site is ready for automatic updates.');
     $page->clickLink('Run cron');
-    $this->assertUpdateSuccessful('9.8.1');
+    // The stage will first destroy the stage made above before going through
+    // stage lifecycle events for the cron update.
+    $expected_events = [
+      PreCreateEvent::class,
+      PostCreateEvent::class,
+      PreRequireEvent::class,
+      PostRequireEvent::class,
+      PreApplyEvent::class,
+      PostApplyEvent::class,
+    ];
+    $this->assertExpectedStageEventsFired(ConsoleUpdateStage::class, $expected_events, 360);
+    $this->assertCronUpdateSuccessful();
   }
 
   /**
@@ -264,46 +269,6 @@ class CoreUpdateTest extends UpdateTestBase {
   }
 
   /**
-   * Sets the version of Drupal core to which the test site will be updated.
-   *
-   * @param string $version
-   *   The Drupal core version to set.
-   */
-  private function setUpstreamCoreVersion(string $version): void {
-    $workspace_dir = $this->getWorkspaceDirectory();
-
-    // Loop through core's metapackages and plugins, and alter them as needed.
-    $packages = str_replace("$workspace_dir/", '', $this->getCorePackages());
-    foreach ($packages as $path) {
-      // Assign the new upstream version.
-      $this->runComposer("composer config version $version", $path);
-
-      // If this package requires Drupal core (e.g., drupal/core-recommended),
-      // make it require the new upstream version.
-      $info = $this->runComposer('composer info --self --format json', $path, TRUE);
-      if (isset($info['requires']['drupal/core'])) {
-        $this->runComposer("composer require --no-update drupal/core:$version", $path);
-      }
-    }
-
-    // Change the \Drupal::VERSION constant and put placeholder text in the
-    // README so we can ensure that we really updated to the correct version. We
-    // also change the default site configuration files so we can ensure that
-    // these are updated as well, despite `sites/default` being write-protected.
-    // @see ::assertUpdateSuccessful()
-    // @see ::createTestProject()
-    Composer::setDrupalVersion($workspace_dir, $version);
-    file_put_contents("$workspace_dir/core/README.txt", "Placeholder for Drupal core $version.");
-
-    foreach (['default.settings.php', 'default.services.yml'] as $file) {
-      $file = fopen("$workspace_dir/core/assets/scaffold/files/$file", 'a');
-      $this->assertIsResource($file);
-      fwrite($file, "# This is part of Drupal $version.\n");
-      fclose($file);
-    }
-  }
-
-  /**
    * Asserts that a specific version of Drupal core is running.
    *
    * Assumes that a user with permission to view the status report is logged in.
@@ -330,6 +295,46 @@ class CoreUpdateTest extends UpdateTestBase {
    *   The expected active version of Drupal core.
    */
   private function assertUpdateSuccessful(string $expected_version): void {
+    $mink = $this->getMink();
+    $page = $mink->getSession()->getPage();
+    $assert_session = $mink->assertSession();
+
+    // There should be log messages, but no errors or warnings should have been
+    // logged by Automatic Updates.
+    // The use of the database log here implies one can only retrieve log
+    // entries through the dblog UI. This seems non-ideal but it is the choice
+    // that requires least custom configuration or custom code. Using the
+    // `syslog` or `syslog_test` module  or the `@RestResource=dblog` plugin for
+    // the `rest` module require more additional code than the inflexible log
+    // querying below.
+    $this->visit('/admin/reports/dblog');
+    $type_select_field = $assert_session->fieldExists('Type');
+
+    // Automatic Updates may not have logged any entries but if it did there
+    // should not have been any errors or warnings.
+    if ($type_select_field->find('named', ['option', 'automatic_updates'])) {
+      $assert_session->pageTextNotContains('No log messages available.');
+      $page->selectFieldOption('Type', 'automatic_updates');
+      $page->selectFieldOption('Severity', 'Emergency', TRUE);
+      $page->selectFieldOption('Severity', 'Alert', TRUE);
+      $page->selectFieldOption('Severity', 'Critical', TRUE);
+      $page->selectFieldOption('Severity', 'Warning', TRUE);
+      $page->pressButton('Filter');
+      $assert_session->pageTextContains('No log messages available.');
+    }
+
+    // \Drupal\automatic_updates\Routing\RouteSubscriber::alterRoutes() sets
+    // `_automatic_updates_status_messages: skip` on the route for the path
+    // `/admin/modules/reports/status`, but not on the `/admin/reports` path. So
+    // to test AdminStatusCheckMessages::displayAdminPageMessages(), another
+    // page must be visited. `/admin/reports` was chosen, but it could be
+    // another too.
+    $this->visit('/admin/reports');
+    $assert_session->statusCodeEquals(200);
+    // @see \Drupal\automatic_updates\Validation\AdminStatusCheckMessages::displayAdminPageMessages()
+    $this->webAssert->statusMessageNotExists('error');
+    $this->webAssert->statusMessageNotExists('warning');
+
     $web_root = $this->getWebRoot();
     $placeholder = file_get_contents("$web_root/core/README.txt");
     $this->assertSame("Placeholder for Drupal core $expected_version.", $placeholder);
@@ -337,7 +342,14 @@ class CoreUpdateTest extends UpdateTestBase {
     foreach (['default.settings.php', 'default.services.yml'] as $file) {
       $file = $web_root . '/sites/default/' . $file;
       $this->assertFileIsReadable($file);
-      $this->assertStringContainsString("# This is part of Drupal $expected_version.", file_get_contents($file));
+      // The `default.settings.php` and `default.services.yml` files are
+      // explicitly excluded from Package Manager operations, since they are not
+      // relevant to existing sites. Therefore, ensure that the changes we made
+      // to the original (scaffold) versions of the files are not present in
+      // the updated site.
+      // @see \Drupal\package_manager\PathExcluder\SiteConfigurationExcluder()
+      // @see \Drupal\Tests\package_manager\Build\TemplateProjectTestBase::setUpstreamCoreVersion()
+      $this->assertStringNotContainsString("# This is part of Drupal $expected_version.", file_get_contents($file));
     }
     $this->assertDirectoryIsNotWritable("$web_root/sites/default");
 
@@ -363,11 +375,10 @@ class CoreUpdateTest extends UpdateTestBase {
     // ...but it should have been updated in the dev dependencies.
     $this->assertSame($expected_version, $info['devRequires']['drupal/core-dev']);
     // The update form should not have any available updates.
-    // @todo Figure out why this assertion fails when the batch processor
-    //   redirects directly to the update form, instead of update.status, when
-    //   updating via the UI.
     $this->visit('/admin/modules/update');
-    $this->getMink()->assertSession()->pageTextContains('No update available');
+    $assert_session = $this->getMink()->assertSession();
+    $assert_session->pageTextContains('No update available');
+    $assert_session->pageTextNotContains('Automatic updates failed to apply, and the site is in an indeterminate state. Consider restoring the code and database from a backup.');
 
     // The status page should report that we're running the expected version and
     // the README and default site configuration files should contain the
@@ -407,6 +418,69 @@ class CoreUpdateTest extends UpdateTestBase {
     $page->pressButton('Update to 9.8.1');
     $this->waitForBatchJob();
     $assert_session->pageTextContains('Ready to update');
+  }
+
+  /**
+   * Assert a cron update ran successfully.
+   */
+  private function assertCronUpdateSuccessful(): void {
+    $mink = $this->getMink();
+    $page = $mink->getSession()->getPage();
+    $this->visit('/admin/reports/dblog');
+
+    // Ensure that the update occurred.
+    $page->selectFieldOption('Severity', 'Info');
+    $page->pressButton('Filter');
+    // There should be a log entry about the successful update.
+    $mink->assertSession()
+      ->elementAttributeContains('named', ['link', 'Drupal core has been updated from 9.8.0 to 9.8.1'], 'href', '/admin/reports/dblog/event/');
+    $this->assertUpdateSuccessful('9.8.1');
+  }
+
+  /**
+   * Tests updating via the console directly.
+   */
+  public function testConsoleUpdate(): void {
+    $this->createTestProject('RecommendedProject');
+
+    $command = [
+      (new PhpExecutableFinder())->find(),
+      $this->getWebRoot() . '/core/scripts/auto-update',
+      '--verbose',
+    ];
+    // BEGIN: DELETE FROM CORE MERGE REQUEST
+    // Use the `auto-update` command proxy that Composer puts into `vendor/bin`,
+    // just to prove that it works.
+    $command[1] = 'vendor/bin/auto-update';
+    // END: DELETE FROM CORE MERGE REQUEST
+
+    $process = (new Process($command))
+      ->setWorkingDirectory($this->getWorkspaceDirectory() . '/project')
+      // Give the update process as much time as it needs to run.
+      ->setTimeout(NULL);
+
+    $output = $process->mustRun()->getOutput();
+    $this->assertStringContainsString('Updating Drupal core to 9.8.1. This may take a while.', $output);
+    $this->assertStringContainsString('Running post-apply tasks and final clean-up...', $output);
+    $this->assertStringContainsString('Drupal core was successfully updated to 9.8.1!', $output);
+    $this->assertStringContainsString('Deleting unused stage directories...', $output);
+    $this->assertUpdateSuccessful('9.8.1');
+    $this->assertExpectedStageEventsFired(ConsoleUpdateStage::class);
+
+    $pattern = '/^Unused stage directory deleted: (.+)$/m';
+    $matches = [];
+    preg_match($pattern, $output, $matches);
+    $this->assertCount(2, $matches, $output);
+    $this->assertDirectoryDoesNotExist($matches[1]);
+
+    // Rerunning the command should exit with a message that no newer version
+    // is available.
+    $output = $process->mustRun()->getOutput();
+    $this->assertStringContainsString("There is no Drupal core update available.", $output);
+    // Any defunct stage directories should still be cleaned up (even though
+    // there aren't any left).
+    $this->assertStringContainsString('Deleting unused stage directories...', $output);
+    $this->assertDoesNotMatchRegularExpression($pattern, $output);
   }
 
 }

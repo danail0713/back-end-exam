@@ -1,10 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Validation;
 
-use Drupal\automatic_updates\CronUpdater;
+use Drupal\automatic_updates\CronUpdateRunner;
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Messenger\MessengerTrait;
@@ -15,7 +16,6 @@ use Drupal\Core\Routing\RedirectDestinationTrait;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
-use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\Url;
 use Drupal\package_manager\ValidationResult;
 use Drupal\system\SystemManager;
@@ -35,92 +35,28 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
   use RedirectDestinationTrait;
   use ValidationResultDisplayTrait;
 
-  /**
-   * The status checker service.
-   *
-   * @var \Drupal\automatic_updates\Validation\StatusChecker
-   */
-  protected $statusChecker;
-
-  /**
-   * The admin context service.
-   *
-   * @var \Drupal\Core\Routing\AdminContext
-   */
-  protected $adminContext;
-
-  /**
-   * The current user.
-   *
-   * @var \Drupal\Core\Session\AccountProxyInterface
-   */
-  protected $currentUser;
-
-  /**
-   * The current route match.
-   *
-   * @var \Drupal\Core\Routing\CurrentRouteMatch
-   */
-  protected $currentRouteMatch;
-
-  /**
-   * The cron updater service.
-   *
-   * @var \Drupal\automatic_updates\CronUpdater
-   */
-  protected $cronUpdater;
-
-  /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  protected $renderer;
-
-  /**
-   * Constructs an AdminStatusCheckMessages object.
-   *
-   * @param \Drupal\automatic_updates\Validation\StatusChecker $status_checker
-   *   The status checker service.
-   * @param \Drupal\Core\Messenger\MessengerInterface $messenger
-   *   The messenger service.
-   * @param \Drupal\Core\Routing\AdminContext $admin_context
-   *   The admin context service.
-   * @param \Drupal\Core\Session\AccountProxyInterface $current_user
-   *   The current user.
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The translation service.
-   * @param \Drupal\Core\Routing\CurrentRouteMatch $current_route_match
-   *   The current route match.
-   * @param \Drupal\automatic_updates\CronUpdater $cron_updater
-   *   The cron updater service.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   */
-  public function __construct(StatusChecker $status_checker, MessengerInterface $messenger, AdminContext $admin_context, AccountProxyInterface $current_user, TranslationInterface $translation, CurrentRouteMatch $current_route_match, CronUpdater $cron_updater, RendererInterface $renderer) {
-    $this->statusChecker = $status_checker;
-    $this->setMessenger($messenger);
-    $this->adminContext = $admin_context;
-    $this->currentUser = $current_user;
-    $this->setStringTranslation($translation);
-    $this->currentRouteMatch = $current_route_match;
-    $this->cronUpdater = $cron_updater;
-    $this->renderer = $renderer;
-  }
+  public function __construct(
+    private readonly StatusChecker $statusChecker,
+    private readonly AdminContext $adminContext,
+    private readonly AccountProxyInterface $currentUser,
+    private readonly CurrentRouteMatch $currentRouteMatch,
+    private readonly CronUpdateRunner $runner,
+    private readonly RendererInterface $renderer,
+    private readonly ConfigFactoryInterface $configFactory,
+  ) {}
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container): self {
     return new static(
-      $container->get('automatic_updates.status_checker'),
-      $container->get('messenger'),
+      $container->get(StatusChecker::class),
       $container->get('router.admin_context'),
       $container->get('current_user'),
-      $container->get('string_translation'),
       $container->get('current_route_match'),
-      $container->get('automatic_updates.cron_updater'),
-      $container->get('renderer')
+      $container->get(CronUpdateRunner::class),
+      $container->get('renderer'),
+      $container->get('config.factory')
     );
   }
 
@@ -132,11 +68,20 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
       return;
     }
     if ($this->statusChecker->getResults() === NULL) {
+      $method = $this->configFactory->get('automatic_updates.settings')
+        ->get('unattended.method');
+
       $checker_url = Url::fromRoute('automatic_updates.status_check')->setOption('query', $this->getDestinationArray());
-      if ($checker_url->access()) {
+      if ($method === 'web' && $checker_url->access()) {
         $this->messenger()->addError($this->t('Your site has not recently run an update readiness check. <a href=":url">Rerun readiness checks now.</a>', [
           ':url' => $checker_url->toString(),
         ]));
+      }
+      elseif ($method === 'console') {
+        // @todo Link to the documentation on how to set up unattended updates
+        //   via the terminal in https://drupal.org/i/3362695.
+        $message = $this->t('Unattended updates are configured to run via the console, but not appear to have run recently.');
+        $this->messenger()->addError($message);
       }
     }
     else {
@@ -154,22 +99,16 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
    * @return bool
    *   Whether the messages should be displayed on the current page.
    */
-  protected function displayResultsOnCurrentPage(): bool {
+  private function displayResultsOnCurrentPage(): bool {
     // If updates will not run during cron then we don't need to show the
     // status checks on admin pages.
-    if ($this->cronUpdater->getMode() === CronUpdater::DISABLED) {
+    if ($this->runner->getMode() === CronUpdateRunner::DISABLED) {
       return FALSE;
     }
 
     if ($this->adminContext->isAdminRoute() && $this->currentUser->hasPermission('administer site configuration')) {
-      $route = $this->currentRouteMatch->getRouteObject();
-      if ($route) {
-        if ($route->hasOption('_automatic_updates_readiness_messages')) {
-          @trigger_error('The _automatic_updates_readiness_messages route option is deprecated in automatic_updates:8.x-2.5 and will be removed in automatic_updates:3.0.0. Use _automatic_updates_status_messages route option instead. See https://www.drupal.org/node/3316086.', E_USER_DEPRECATED);
-          $route->setOption('_automatic_updates_status_messages', $route->getOption('_automatic_updates_readiness_messages'));
-        }
-        return $route->getOption('_automatic_updates_status_messages') !== 'skip';
-      }
+      return $this->currentRouteMatch->getRouteObject()
+        ?->getOption('_automatic_updates_status_messages') !== 'skip';
     }
     return FALSE;
   }
@@ -184,7 +123,7 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
    * @return bool
    *   Whether any results were displayed.
    */
-  protected function displayResultsForSeverity(int $severity): bool {
+  private function displayResultsForSeverity(int $severity): bool {
     $results = $this->statusChecker->getResults($severity);
     if (empty($results)) {
       return FALSE;
@@ -233,7 +172,7 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
    * @param \Drupal\Core\Render\RendererInterface $renderer
    *   The renderer service.
    */
-  protected function displayResults(array $results, MessengerInterface $messenger, RendererInterface $renderer): void {
+  private function displayResults(array $results, MessengerInterface $messenger, RendererInterface $renderer): void {
     $severity = ValidationResult::getOverallSeverity($results);
 
     if ($severity === SystemManager::REQUIREMENT_OK) {
@@ -244,9 +183,9 @@ final class AdminStatusCheckMessages implements ContainerInjectionInterface {
     // multiple messages. This is because, on regular admin pages, we merely
     // want to alert users that problems exist, but not burden them with the
     // details. They can get those on the status report and updater form.
-    $format_result = function (ValidationResult $result): TranslatableMarkup {
-      $messages = $result->getMessages();
-      return $result->getSummary() ?: reset($messages);
+    $format_result = function (ValidationResult $result): TranslatableMarkup|string {
+      $messages = $result->messages;
+      return $result->summary ?: reset($messages);
     };
     // Format the results as a single item list prefixed by a preamble message.
     $build = [

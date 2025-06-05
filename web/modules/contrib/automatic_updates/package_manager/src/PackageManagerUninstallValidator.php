@@ -1,14 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
+use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Extension\ModuleUninstallValidatorInterface;
+use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use PhpTuf\ComposerStager\Infrastructure\Factory\Path\PathFactoryInterface;
-use Symfony\Component\DependencyInjection\ContainerAwareInterface;
-use Symfony\Component\DependencyInjection\ContainerAwareTrait;
+use Drupal\Core\TempStore\SharedTempStoreFactory;
+use PhpTuf\ComposerStager\API\Core\BeginnerInterface;
+use PhpTuf\ComposerStager\API\Core\CommitterInterface;
+use PhpTuf\ComposerStager\API\Core\StagerInterface;
+use PhpTuf\ComposerStager\API\Path\Factory\PathFactoryInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Prevents any module from being uninstalled if update is in process.
@@ -18,29 +23,38 @@ use Symfony\Component\DependencyInjection\ContainerAwareTrait;
  *   at any time without warning. External code should not interact with this
  *   class.
  */
-final class PackageManagerUninstallValidator implements ModuleUninstallValidatorInterface, ContainerAwareInterface {
+final class PackageManagerUninstallValidator implements ModuleUninstallValidatorInterface {
 
-  use ContainerAwareTrait;
   use StringTranslationTrait;
+
+  public function __construct(
+    private readonly PathLocator $pathLocator,
+    private readonly BeginnerInterface $beginner,
+    private readonly StagerInterface $stager,
+    private readonly CommitterInterface $committer,
+    private readonly QueueFactory $queueFactory,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly SharedTempStoreFactory $sharedTempStoreFactory,
+    private readonly TimeInterface $time,
+    private readonly PathFactoryInterface $pathFactory,
+    private readonly FailureMarker $failureMarker,
+  ) {}
 
   /**
    * {@inheritdoc}
    */
   public function validate($module) {
-    $stage = new Stage(
-      // @todo Remove this in https://www.drupal.org/i/3303167
-      new UnusedConfigFactory(),
-      $this->container->get('package_manager.path_locator'),
-      $this->container->get('package_manager.beginner'),
-      $this->container->get('package_manager.stager'),
-      $this->container->get('package_manager.committer'),
-      $this->container->get('file_system'),
-      $this->container->get('event_dispatcher'),
-      $this->container->get('tempstore.shared'),
-      $this->container->get('datetime.time'),
-      $this->container->get(PathFactoryInterface::class),
-      $this->container->get('package_manager.failure_marker')
-    );
+    $stage = new class(
+      $this->pathLocator,
+      $this->beginner,
+      $this->stager,
+      $this->committer,
+      $this->queueFactory,
+      $this->eventDispatcher,
+      $this->sharedTempStoreFactory,
+      $this->time,
+      $this->pathFactory,
+      $this->failureMarker) extends StageBase {};
     if ($stage->isAvailable() || !$stage->isApplying()) {
       return [];
     }

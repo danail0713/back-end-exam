@@ -1,10 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
-use Drupal\package_manager\Exception\StageValidationException;
+use Drupal\package_manager\Exception\StageEventException;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ValidationResult;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -21,7 +22,7 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
    * @return mixed[][]
    *   The test cases.
    */
-  public function providerDuplicateInfoFilesInStage(): array {
+  public static function providerDuplicateInfoFilesInStage(): array {
     return [
       'Duplicate info.yml files in stage' => [
         [
@@ -33,7 +34,7 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
         ],
         [
           ValidationResult::createError([
-            'The stage directory has 2 instances of module.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 2 instances of module.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.'),
           ]),
         ],
       ],
@@ -97,7 +98,7 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
         ],
         [
           ValidationResult::createError([
-            'The stage directory has 2 instances of module.info.yml. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 2 instances of module.info.yml. This likely indicates that a duplicate extension was installed.'),
           ]),
         ],
       ],
@@ -124,60 +125,60 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
       ],
       'Multiple duplicate info.yml files in stage' => [
         [
-          '/module1.info.yml',
-          '/module2.info.yml',
+          '/modules/module1/module1.info.yml',
+          '/modules/module2/module2.info.yml',
         ],
         [
-          '/module1.info.yml',
-          '/modules/module1.info.yml',
-          '/module2.info.yml',
-          '/modules/module2.info.yml',
-          '/module2/module2.info.yml',
+          '/modules/module1/module1.info.yml',
+          '/modules/module2/module2.info.yml',
+          '/modules/foo/module1.info.yml',
+          '/modules/bar/module2.info.yml',
+          '/modules/baz/module2.info.yml',
         ],
         [
           ValidationResult::createError([
-            'The stage directory has 3 instances of module2.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 3 instances of module2.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.'),
           ]),
           ValidationResult::createError([
-            'The stage directory has 2 instances of module1.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 2 instances of module1.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.'),
           ]),
         ],
       ],
       'Multiple duplicate info.yml files in stage not present in active' => [
         [],
         [
-          '/module1.info.yml',
-          '/modules/module1.info.yml',
-          '/module2.info.yml',
-          '/modules/module2.info.yml',
-          '/module2/module2.info.yml',
+          '/modules/module1/module1.info.yml',
+          '/modules/module2/module2.info.yml',
+          '/modules/foo/module1.info.yml',
+          '/modules/bar/module2.info.yml',
+          '/modules/baz/module2.info.yml',
         ],
         [
           ValidationResult::createError([
-            'The stage directory has 3 instances of module2.info.yml. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 3 instances of module2.info.yml. This likely indicates that a duplicate extension was installed.'),
           ]),
           ValidationResult::createError([
-            'The stage directory has 2 instances of module1.info.yml. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 2 instances of module1.info.yml. This likely indicates that a duplicate extension was installed.'),
           ]),
         ],
       ],
       'Multiple duplicate info.yml files in stage with one info.yml file not present in active' => [
         [
-          '/module1.info.yml',
+          '/modules/module1/module1.info.yml',
         ],
         [
-          '/module1.info.yml',
-          '/modules/module1.info.yml',
-          '/module2.info.yml',
-          '/modules/module2.info.yml',
-          '/module2/module2.info.yml',
+          '/modules/module1/module1.info.yml',
+          '/modules/module2/module2.info.yml',
+          '/modules/foo/module1.info.yml',
+          '/modules/bar/module2.info.yml',
+          '/modules/baz/module2.info.yml',
         ],
         [
           ValidationResult::createError([
-            'The stage directory has 3 instances of module2.info.yml. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 3 instances of module2.info.yml. This likely indicates that a duplicate extension was installed.'),
           ]),
           ValidationResult::createError([
-            'The stage directory has 2 instances of module1.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.',
+            t('The stage directory has 2 instances of module1.info.yml as compared to 1 in the active directory. This likely indicates that a duplicate extension was installed.'),
           ]),
         ],
       ],
@@ -201,8 +202,7 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
     $stage->create();
     $stage->require(['composer/semver:^3']);
 
-    $active_dir = $this->container->get('package_manager.path_locator')
-      ->getProjectRoot();
+    $active_dir = $this->container->get(PathLocator::class)->getProjectRoot();
     $stage_dir = $stage->getStageDirectory();
     foreach ($active_info_files as $active_info_file) {
       $this->createFileAtPath($active_dir, $active_info_file);
@@ -214,9 +214,9 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
       $stage->apply();
       $this->assertEmpty($expected_results);
     }
-    catch (StageValidationException $e) {
+    catch (StageEventException $e) {
       $this->assertNotEmpty($expected_results);
-      $this->assertValidationResultsEqual($expected_results, $e->getResults());
+      $this->assertValidationResultsEqual($expected_results, $e->event->getResults());
     }
   }
 
@@ -236,7 +236,7 @@ class DuplicateInfoFileValidatorTest extends PackageManagerKernelTestBase {
     if (!file_exists($file_dir)) {
       $fs->mkdir($root_directory . $file_dir);
     }
-    file_put_contents($root_directory . $file_path, ' ');
+    file_put_contents($root_directory . $file_path, "name: SOME MODULE\ntype: module\n");
   }
 
 }

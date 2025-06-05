@@ -5,3 +5,27 @@ instructor_management.log_in_instructor:
     _form: 'Drupal\instructor_management\Form\LogInAsInstructorForm'
   requirements:
     _permission: 'access content'
+
+instructor_management.add_resources:
+  path: '/add-resources'
+  defaults:
+    _title: 'Add Resources'
+    _form: 'Drupal\instructor_management\Form\AddResourcesForm'
+  requirements:
+    _permission: 'access add resources form'
+
+instructor_management.add_homework:
+  path: '/add-homework'
+  defaults:
+    _title: 'Add Homework'
+    _form: 'Drupal\instructor_management\Form\AddHomeworkForm'
+  requirements:
+    _permission: 'access add homework form'
+
+instructor_management.view_homeworks:
+  path: '/view-homeworks'
+  defaults:
+    _title: 'View Homeworks'
+    _form: 'Drupal\instructor_management\Form\ViewHomeworksForm'
+  requirements:
+    _permission: 'access view homeworks form'

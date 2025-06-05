@@ -1,4 +1,6 @@
 {
+  "name": "fake/site",
+  "description": "bull shit",
   "version": "1.2.4",
   "require": {
     "drupal/core-recommended": "9.8.0",
@@ -18,42 +20,23 @@
         "bar": 134,
         "foo-bar": null
     },
-    "baz": null
+    "baz": null,
+    "installer-paths": {
+      "modules/contrib/{$name}": ["type:drupal-module"],
+      "profiles/contrib/{$name}": ["type:drupal-profile"],
+      "themes/contrib/{$name}": ["type:drupal-theme"]
+    }
   },
   "repositories": {
-    "packagist.org": false,
-    "drupal/core-recommended": {
-      "type": "path",
-      "version": "9.8.0",
-      "url": "../path_repos/drupal--core-recommended",
-      "options": {
-        "symlink": false
-      }
+    "fake-packages": {
+      "type": "composer",
+      "url": "./"
     },
-    "drupal/core-dev": {
+    "custom-package": {
       "type": "path",
-      "version": "9.8.0",
-      "url": "../path_repos/drupal--core-dev",
-      "options": {
-        "symlink": false
-      }
+      "url": "custom/package"
     },
-    "drupal/core": {
-      "type": "path",
-      "version": "9.8.0",
-      "url": "../path_repos/drupal--core",
-      "options": {
-        "symlink": false
-      }
-    },
-    "cweagans/composer-patches": {
-      "type": "path",
-      "version": "24.12.1999",
-      "url": "../path_repos/cweagans--composer-patches",
-      "options": {
-        "symlink": false
-      }
-    }
+    "packagist.org": false
   },
   "minimum-stability": "stable",
   "config": {

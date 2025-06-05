@@ -1,14 +1,16 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel\PathExcluder;
 
-use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\Core\File\FileSystemInterface;
 use Drupal\Core\Serialization\Yaml;
 use Drupal\fixture_manipulator\ActiveFixtureManipulator;
+use Drupal\package_manager\PathLocator;
 use Drupal\Tests\package_manager\Kernel\PackageManagerKernelTestBase;
+use Drupal\Tests\package_manager\Traits\ComposerInstallersTrait;
+use PhpTuf\ComposerStager\API\Core\BeginnerInterface;
+use PhpTuf\ComposerStager\API\Core\CommitterInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
@@ -18,46 +20,42 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 class GitExcluderTest extends PackageManagerKernelTestBase {
 
-  /**
-   * The mocked file system service.
-   *
-   * @var \Drupal\Core\File\FileSystemInterface|\Prophecy\Prophecy\ObjectProphecy
-   */
-  private $fileSystem;
+  use ComposerInstallersTrait;
 
   /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
-    // In this test, we want to disable the lock file validator because, even
-    // though both the active and stage directories will have a valid lock file,
-    // this validator will complain because they don't differ at all.
-    $this->disableValidators[] = 'package_manager.validator.lock_file';
     parent::setUp();
-    $path_locator = $this->container->get('package_manager.path_locator');
-    (new ActiveFixtureManipulator())
+    $project_root = $this->container->get(PathLocator::class)->getProjectRoot();
+    $this->installComposerInstallers($project_root);
+    $active_manipulator = new ActiveFixtureManipulator();
+    $active_manipulator
       ->addPackage([
         'name' => 'foo/package_known_to_composer_removed_later',
         'type' => 'drupal-module',
         'version' => '1.0.0',
-        'install_path' => "../../modules/module_known_to_composer_removed_later",
-      ])
-      ->addProjectAtPath("modules/module_not_known_to_composer_in_active")
-      ->addDotGitFolder($path_locator->getProjectRoot() . "/modules/module_not_known_to_composer_in_active")
-      ->addDotGitFolder($path_locator->getProjectRoot() . "/modules/module_known_to_composer_removed_later")
+      ], FALSE, TRUE)
+      ->addPackage([
+        'name' => 'foo/custom_package_known_to_composer',
+        'type' => 'drupal-custom-module',
+        'version' => '1.0.0',
+      ], FALSE, TRUE)
+      ->addPackage([
+        'name' => 'foo/package_with_different_installer_path_known_to_composer',
+        'type' => 'drupal-module',
+        'version' => '1.0.0',
+      ], FALSE, TRUE);
+    // Set the installer path config in the project root where we install the
+    // package.
+    $installer_paths['different_installer_path/package_known_to_composer'] = ['foo/package_with_different_installer_path_known_to_composer'];
+    $this->setInstallerPaths($installer_paths, $project_root);
+    $active_manipulator->addProjectAtPath("modules/module_not_known_to_composer_in_active")
+      ->addDotGitFolder($project_root . "/modules/module_not_known_to_composer_in_active")
+      ->addDotGitFolder($project_root . "/modules/contrib/package_known_to_composer_removed_later")
+      ->addDotGitFolder($project_root . "/modules/custom/custom_package_known_to_composer")
+      ->addDotGitFolder($project_root . "/different_installer_path/package_known_to_composer")
       ->commitChanges();
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function register(ContainerBuilder $container) {
-    parent::register($container);
-
-    $this->fileSystem = $this->prophesize(FileSystemInterface::class);
-
-    $container->getDefinition('package_manager.git_excluder')
-      ->setArgument('$file_system', $this->fileSystem->reveal());
   }
 
   /**
@@ -69,8 +67,8 @@ class GitExcluderTest extends PackageManagerKernelTestBase {
 
     $stage = $this->createStage();
     $stage->create();
-    /** @var \Drupal\package_manager_bypass\BypassedStagerServiceBase $beginner */
-    $beginner = $this->container->get('package_manager.beginner');
+    /** @var \Drupal\package_manager_bypass\LoggingBeginner $beginner */
+    $beginner = $this->container->get(BeginnerInterface::class);
     $beginner_args = $beginner->getInvocationArguments();
     $excluded_paths = [
       '.git',
@@ -78,7 +76,15 @@ class GitExcluderTest extends PackageManagerKernelTestBase {
       'modules/example/.git',
     ];
     foreach ($excluded_paths as $excluded_path) {
-      $this->assertContains($excluded_path, $beginner_args[0][2]->getAll());
+      $this->assertContains($excluded_path, $beginner_args[0][2]);
+    }
+    $not_excluded_paths = [
+      'modules/contrib/package_known_to_composer_removed_later/.git',
+      'modules/custom/custom_package_known_to_composer/.git',
+      'different_installer_path/package_known_to_composer/.git',
+    ];
+    foreach ($not_excluded_paths as $not_excluded_path) {
+      $this->assertNotContains($not_excluded_path, $beginner_args[0][2]);
     }
   }
 
@@ -94,6 +100,7 @@ class GitExcluderTest extends PackageManagerKernelTestBase {
 
     $stage = $this->createStage();
     $stage->create();
+    $stage->require(['ext-json:*']);
     $stage_dir = $stage->getStageDirectory();
 
     // Adding a module with .git in stage which is unknown to composer, we
@@ -106,14 +113,14 @@ class GitExcluderTest extends PackageManagerKernelTestBase {
       Yaml::encode([
         'name' => 'Unknown to composer in stage',
         'type' => 'module',
-        'core_version_requirement' => '^9.3 || ^10',
+        'core_version_requirement' => '^9.7 || ^10',
       ])
     );
-    file_put_contents("$path/.git/ignored.txt", 'Phoenix!');
+    file_put_contents("$path/.git/excluded.txt", 'Phoenix!');
 
     $stage->apply();
-    /** @var \Drupal\package_manager_bypass\BypassedStagerServiceBase $committer */
-    $committer = $this->container->get('package_manager.committer');
+    /** @var \Drupal\package_manager_bypass\LoggingCommitter $committer */
+    $committer = $this->container->get(CommitterInterface::class);
     $committer_args = $committer->getInvocationArguments();
     $excluded_paths = [
       '.git',
@@ -125,9 +132,9 @@ class GitExcluderTest extends PackageManagerKernelTestBase {
     // new .git folder in stage directory that either composer is aware of it or
     // the developer knows what they are doing.
     foreach ($excluded_paths as $excluded_path) {
-      $this->assertContains($excluded_path, $committer_args[0][2]->getAll());
+      $this->assertContains($excluded_path, $committer_args[0][2]);
     }
-    $this->assertNotContains('modules/unknown_to_composer_in_stage/.git', $committer_args[0][2]->getAll());
+    $this->assertNotContains('modules/unknown_to_composer_in_stage/.git', $committer_args[0][2]);
   }
 
 }

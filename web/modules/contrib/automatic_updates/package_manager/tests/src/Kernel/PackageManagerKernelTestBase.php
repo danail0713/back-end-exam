@@ -1,22 +1,27 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
+use ColinODell\PsrTestLogger\TestLogger;
 use Drupal\Component\FileSystem\FileSystem as DrupalFileSystem;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
+use Drupal\Core\Logger\RfcLogLevel;
+use Drupal\Core\Queue\QueueFactory;
 use Drupal\Core\Site\Settings;
 use Drupal\fixture_manipulator\StageFixtureManipulator;
 use Drupal\KernelTests\KernelTestBase;
 use Drupal\package_manager\Event\PreApplyEvent;
-use Drupal\package_manager\Event\StageEvent;
+use Drupal\package_manager\Event\PreOperationStageEvent;
+use Drupal\package_manager\Exception\StageEventException;
+use Drupal\package_manager\FailureMarker;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\StatusCheckTrait;
-use Drupal\package_manager\UnusedConfigFactory;
 use Drupal\package_manager\Validator\DiskSpaceValidator;
-use Drupal\package_manager\Exception\StageValidationException;
-use Drupal\package_manager\Stage;
+use Drupal\package_manager\StageBase;
 use Drupal\Tests\package_manager\Traits\AssertPreconditionsTrait;
+use Drupal\Tests\package_manager\Traits\ComposerStagerTestTrait;
 use Drupal\Tests\package_manager\Traits\FixtureManipulatorTrait;
 use Drupal\Tests\package_manager\Traits\FixtureUtilityTrait;
 use Drupal\Tests\package_manager\Traits\ValidationTestTrait;
@@ -25,7 +30,10 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
-use PhpTuf\ComposerStager\Infrastructure\Factory\Path\PathFactory;
+use PhpTuf\ComposerStager\API\Core\BeginnerInterface;
+use PhpTuf\ComposerStager\API\Core\CommitterInterface;
+use PhpTuf\ComposerStager\API\Core\StagerInterface;
+use PhpTuf\ComposerStager\API\Path\Factory\PathFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -37,6 +45,7 @@ use Symfony\Component\Filesystem\Filesystem;
 abstract class PackageManagerKernelTestBase extends KernelTestBase {
 
   use AssertPreconditionsTrait;
+  use ComposerStagerTestTrait;
   use FixtureManipulatorTrait;
   use FixtureUtilityTrait;
   use StatusCheckTrait;
@@ -74,12 +83,39 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
   protected $disableValidators = [];
 
   /**
+   * The test root directory, if any, created by ::createTestProject().
+   *
+   * @var string|null
+   *
+   * @see ::createTestProject()
+   * @see ::tearDown()
+   */
+  protected ?string $testProjectRoot = NULL;
+
+  /**
+   * The Symfony filesystem class.
+   *
+   * @var \Symfony\Component\Filesystem\Filesystem
+   */
+  private Filesystem $fileSystem;
+
+  /**
+   * A logger that will fail the test if Package Manager logs any errors.
+   *
+   * @var \ColinODell\PsrTestLogger\TestLogger
+   *
+   * @see ::tearDown()
+   */
+  protected TestLogger $failureLogger;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp(): void {
     parent::setUp();
     $this->installConfig('package_manager');
 
+    $this->fileSystem = new Filesystem();
     $this->createTestProject();
 
     // The Update module's default configuration must be installed for our
@@ -89,6 +125,21 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
 
     // Make the update system think that all of System's post-update functions
     // have run.
+    $this->registerPostUpdateFunctions();
+
+    // Ensure we can fail the test if any warnings, or worse, are logged by
+    // Package Manager.
+    // @see ::tearDown()
+    $this->failureLogger = new TestLogger();
+    $this->container->get('logger.channel.package_manager')
+      ->addLogger($this->failureLogger);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function enableModules(array $modules) {
+    parent::enableModules($modules);
     $this->registerPostUpdateFunctions();
   }
 
@@ -110,7 +161,10 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
     // 'persist' tag prevents the mock from being destroyed during a container
     // rebuild.
     // @see ::createTestProject()
-    $container->getDefinition('package_manager.validator.disk_space')
+    $container->getDefinition(DiskSpaceValidator::class)->addTag('persist');
+
+    // Ensure that our failure logger will survive container rebuilds.
+    $container->getDefinition('logger.channel.package_manager')
       ->addTag('persist');
 
     foreach ($this->disableValidators as $service_id) {
@@ -128,18 +182,16 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
    */
   protected function createStage(): TestStage {
     return new TestStage(
-      // @todo Remove this in https://www.drupal.org/i/3303167
-      new UnusedConfigFactory(),
-      $this->container->get('package_manager.path_locator'),
-      $this->container->get('package_manager.beginner'),
-      $this->container->get('package_manager.stager'),
-      $this->container->get('package_manager.committer'),
-      $this->container->get('file_system'),
+      $this->container->get(PathLocator::class),
+      $this->container->get(BeginnerInterface::class),
+      $this->container->get(StagerInterface::class),
+      $this->container->get(CommitterInterface::class),
+      $this->container->get(QueueFactory::class),
       $this->container->get('event_dispatcher'),
       $this->container->get('tempstore.shared'),
       $this->container->get('datetime.time'),
-      new PathFactory(),
-      $this->container->get('package_manager.failure_marker')
+      $this->container->get(PathFactoryInterface::class),
+      $this->container->get(FailureMarker::class)
     );
   }
 
@@ -152,10 +204,10 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
    *   (optional) The class of the event which should return the results. Must
    *   be passed if $expected_results is not empty.
    *
-   * @return \Drupal\package_manager\Stage
+   * @return \Drupal\package_manager\StageBase
    *   The stage that was used to collect the validation results.
    */
-  protected function assertResults(array $expected_results, string $event_class = NULL): Stage {
+  protected function assertResults(array $expected_results, ?string $event_class = NULL): StageBase {
     $stage = $this->createStage();
 
     try {
@@ -168,14 +220,10 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
       // If we did not get an exception, ensure we didn't expect any results.
       $this->assertValidationResultsEqual([], $expected_results);
     }
-    catch (TestStageValidationException $e) {
-      $this->assertValidationResultsEqual($expected_results, $e->getResults());
+    catch (StageEventException $e) {
       $this->assertNotEmpty($expected_results);
-      // TestStage::dispatch() throws TestStageValidationException with the
-      // event object so that we can analyze it.
-      $this->assertNotEmpty($event_class);
-      $this->assertInstanceOf(StageValidationException::class, $e->getOriginalException());
-      $this->assertInstanceOf($event_class, $e->getEvent());
+      $this->assertInstanceOf($event_class, $e->event);
+      $this->assertExpectedResultsFromException($expected_results, $e);
     }
     return $stage;
   }
@@ -189,7 +237,7 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
    *   (optional) The test stage to use to create the status check event. If
    *   none is provided a new stage will be created.
    */
-  protected function assertStatusCheckResults(array $expected_results, Stage $stage = NULL): void {
+  protected function assertStatusCheckResults(array $expected_results, ?StageBase $stage = NULL): void {
     $actual_results = $this->runStatusCheck($stage ?? $this->createStage(), $this->container->get('event_dispatcher'));
     $this->assertValidationResultsEqual($expected_results, $actual_results);
   }
@@ -202,8 +250,9 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
    * up-to-date state.
    */
   protected function registerPostUpdateFunctions(): void {
-    $updates = $this->container->get('update.post_update_registry')
-      ->getPendingUpdateFunctions();
+    static $updates = [];
+    $updates = array_merge($updates, $this->container->get('update.post_update_registry')
+      ->getPendingUpdateFunctions());
 
     $this->container->get('keyvalue')
       ->get('post_update')
@@ -232,31 +281,23 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
       $called = TRUE;
     }
 
-    $source_dir = $source_dir ?? __DIR__ . '/../../fixtures/fake_site';
-    $root = DrupalFileSystem::getOsTemporaryDirectory() . DIRECTORY_SEPARATOR . 'package_manager_testing_root' . $this->databasePrefix;
-    $fs = new Filesystem();
-    if (is_dir($root)) {
-      $fs->remove($root);
+    $this->testProjectRoot = DrupalFileSystem::getOsTemporaryDirectory() . DIRECTORY_SEPARATOR . 'package_manager_testing_root' . $this->databasePrefix;
+    if (is_dir($this->testProjectRoot)) {
+      $this->fileSystem->remove($this->testProjectRoot);
     }
-    $fs->mkdir($root);
+    $this->fileSystem->mkdir($this->testProjectRoot);
 
     // Create the active directory and copy its contents from a fixture.
-    $active_dir = $root . DIRECTORY_SEPARATOR . 'active';
+    $active_dir = $this->testProjectRoot . DIRECTORY_SEPARATOR . 'active';
     $this->assertTrue(mkdir($active_dir));
-    static::copyFixtureFilesTo($source_dir, $active_dir);
-
-    // Make sure that the path repositories exist in the test project too.
-    (new Filesystem())->mirror(__DIR__ . '/../../fixtures/path_repos', $root . DIRECTORY_SEPARATOR . 'path_repos', NULL, [
-      'override' => TRUE,
-      'delete' => FALSE,
-    ]);
+    static::copyFixtureFilesTo($source_dir ?? __DIR__ . '/../../fixtures/fake_site', $active_dir);
 
     // Removing 'vfs://root/' from site path set in
     // \Drupal\KernelTests\KernelTestBase::setUpFilesystem as we don't use vfs.
     $test_site_path = str_replace('vfs://root/', '', $this->siteDirectory);
 
     // Copy directory structure from vfs site directory to our site directory.
-    (new Filesystem())->mirror($this->siteDirectory, $active_dir . DIRECTORY_SEPARATOR . $test_site_path);
+    $this->fileSystem->mirror($this->siteDirectory, $active_dir . DIRECTORY_SEPARATOR . $test_site_path);
 
     // Override siteDirectory to point to root/active/... instead of root/... .
     $this->siteDirectory = $active_dir . DIRECTORY_SEPARATOR . $test_site_path;
@@ -268,21 +309,18 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
     new Settings($settings);
 
     // Create a stage root directory alongside the active directory.
-    $staging_root = $root . DIRECTORY_SEPARATOR . 'stage';
+    $staging_root = $this->testProjectRoot . DIRECTORY_SEPARATOR . 'stage';
     $this->assertTrue(mkdir($staging_root));
 
     // Ensure the path locator points to the test project. We assume that is its
     // own web root and the vendor directory is at its top level.
     /** @var \Drupal\package_manager_bypass\MockPathLocator $path_locator */
-    $path_locator = $this->container->get('package_manager.path_locator');
+    $path_locator = $this->container->get(PathLocator::class);
     $path_locator->setPaths($active_dir, $active_dir . '/vendor', '', $staging_root);
 
     // This validator will persist through container rebuilds.
     // @see ::register()
-    $validator = new TestDiskSpaceValidator(
-      $path_locator,
-      $this->container->get('string_translation')
-    );
+    $validator = new TestDiskSpaceValidator($path_locator);
     // By default, the validator should report that the root, vendor, and
     // temporary directories have basically infinite free space.
     $validator->freeSpace = [
@@ -290,23 +328,14 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
       $path_locator->getVendorDirectory() => PHP_INT_MAX,
       $validator->temporaryDirectory() => PHP_INT_MAX,
     ];
-    $this->container->set('package_manager.validator.disk_space', $validator);
-  }
-
-  /**
-   * Copies a fixture directory into the active directory.
-   *
-   * @param string $active_fixture_dir
-   *   Path to fixture active directory from which the files will be copied.
-   */
-  protected function copyFixtureFolderToActiveDirectory(string $active_fixture_dir) {
-    $active_dir = $this->container->get('package_manager.path_locator')
-      ->getProjectRoot();
-    static::copyFixtureFilesTo($active_fixture_dir, $active_dir);
+    $this->container->set(DiskSpaceValidator::class, $validator);
   }
 
   /**
    * Sets the current (running) version of core, as known to the Update module.
+   *
+   * @todo Remove this function with use of the trait from the Update module in
+   *   https://drupal.org/i/3348234.
    *
    * @param string $version
    *   The current version of core.
@@ -387,80 +416,40 @@ abstract class PackageManagerKernelTestBase extends KernelTestBase {
    * {@inheritdoc}
    */
   protected function tearDown(): void {
+    // Delete the test project root, which contains the active directory and
+    // the stage directory. First, make it writable in case any permissions were
+    // changed during the test.
+    if ($this->testProjectRoot) {
+      $this->fileSystem->chmod($this->testProjectRoot, 0777, 0000, TRUE);
+      $this->fileSystem->remove($this->testProjectRoot);
+    }
+
     StageFixtureManipulator::handleTearDown();
-  }
 
-}
-
-/**
- * Test-only class to associate event with StageValidationException.
- *
- * @todo Remove this class in https://drupal.org/i/3331355 or if that issue is
- *   closed without adding the ability to associate events with exceptions
- *   remove this comment.
- */
-final class TestStageValidationException extends StageValidationException {
-
-  /**
-   * The stage event.
-   *
-   * @var \Drupal\package_manager\Event\StageEvent
-   */
-  private $event;
-
-  /**
-   * The original exception.
-   *
-   * @var \Drupal\package_manager\Exception\StageValidationException
-   */
-  private $originalException;
-
-  public function __construct(StageValidationException $original_exception, StageEvent $event) {
-    parent::__construct($original_exception->getResults(), $original_exception->getMessage(), $original_exception->getCode(), $original_exception);
-    $this->originalException = $original_exception;
-    $this->event = $event;
+    // Ensure no warnings (or worse) were logged by Package Manager.
+    $this->assertFalse($this->failureLogger->hasRecords(RfcLogLevel::EMERGENCY), 'Package Manager logged emergencies.');
+    $this->assertFalse($this->failureLogger->hasRecords(RfcLogLevel::ALERT), 'Package Manager logged alerts.');
+    $this->assertFalse($this->failureLogger->hasRecords(RfcLogLevel::CRITICAL), 'Package Manager logged critical errors.');
+    $this->assertFalse($this->failureLogger->hasRecords(RfcLogLevel::ERROR), 'Package Manager logged errors.');
+    $this->assertFalse($this->failureLogger->hasRecords(RfcLogLevel::WARNING), 'Package Manager logged warnings.');
+    parent::tearDown();
   }
 
   /**
-   * Gets the original exception which is triggered at the event.
+   * Asserts that a StageEventException has a particular set of results.
    *
-   * @return \Drupal\package_manager\Exception\StageValidationException
-   *   Exception triggered at event.
+   * @param array $expected_results
+   *   The expected results.
+   * @param \Drupal\package_manager\Exception\StageEventException $exception
+   *   The exception.
    */
-  public function getOriginalException(): StageValidationException {
-    return $this->originalException;
-  }
+  protected function assertExpectedResultsFromException(array $expected_results, StageEventException $exception): void {
+    $event = $exception->event;
+    $this->assertInstanceOf(PreOperationStageEvent::class, $event);
 
-  /**
-   * Gets the stage event which triggers the exception.
-   *
-   * @return \Drupal\package_manager\Event\StageEvent
-   *   Event triggering stage exception.
-   */
-  public function getEvent(): StageEvent {
-    return $this->event;
-  }
-
-}
-
-/**
- * Common functions for test stages.
- */
-trait TestStageTrait {
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function dispatch(StageEvent $event, callable $on_error = NULL): void {
-    try {
-      parent::dispatch($event, $on_error);
-    }
-    catch (StageValidationException $e) {
-      // Throw TestStageValidationException with event object so that test
-      // code can verify that the exception was thrown when a specific event was
-      // dispatched.
-      throw new TestStageValidationException($e, $event);
-    }
+    $stage = $event->stage;
+    $stage_dir = $stage->stageDirectoryExists() ? $stage->getStageDirectory() : NULL;
+    $this->assertValidationResultsEqual($expected_results, $event->getResults(), NULL, $stage_dir);
   }
 
 }
@@ -468,9 +457,12 @@ trait TestStageTrait {
 /**
  * Defines a stage specifically for testing purposes.
  */
-class TestStage extends Stage {
+class TestStage extends StageBase {
 
-  use TestStageTrait;
+  /**
+   * {@inheritdoc}
+   */
+  protected string $type = 'package_manager:test';
 
   /**
    * {@inheritdoc}

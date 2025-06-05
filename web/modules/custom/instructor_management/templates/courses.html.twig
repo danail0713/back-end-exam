@@ -1,0 +1,10 @@
+<h3>{{ 'Courses I teach'|t }}</h3>
+{% if instructor_courses %}
+	{% for course in instructor_courses %}
+		<a href="{{ url('entity.node.canonical', {'node': course.id}) }}">
+			<h4>{{ course.label }}</h4>
+		</a>
+	{% endfor %}
+{% else %}
+	<p>{{ 'No courses to teach.'|t }}</p>
+{% endif %}

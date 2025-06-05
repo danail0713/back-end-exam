@@ -1,21 +1,18 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager_test_validation\EventSubscriber;
 
 use Drupal\Core\State\StateInterface;
 use Drupal\package_manager\Event\PostApplyEvent;
 use Drupal\package_manager\Event\PostCreateEvent;
-use Drupal\package_manager\Event\PostDestroyEvent;
 use Drupal\package_manager\Event\PostRequireEvent;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
-use Drupal\package_manager\Event\PreDestroyEvent;
 use Drupal\package_manager\Event\PreRequireEvent;
 use Drupal\package_manager\Event\StageEvent;
 use Drupal\package_manager\Event\StatusCheckEvent;
-use Drupal\system\SystemManager;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -144,12 +141,7 @@ class TestSubscriber implements EventSubscriberInterface {
     }
     /** @var \Drupal\package_manager\ValidationResult $result */
     foreach ($results as $result) {
-      if ($result->getSeverity() === SystemManager::REQUIREMENT_ERROR) {
-        $event->addError($result->getMessages(), $result->getSummary());
-      }
-      else {
-        $event->addWarning($result->getMessages(), $result->getSummary());
-      }
+      $event->addResult($result);
     }
   }
 
@@ -166,8 +158,6 @@ class TestSubscriber implements EventSubscriberInterface {
       PostRequireEvent::class => ['handleEvent', $priority],
       PreApplyEvent::class => ['handleEvent', $priority],
       PostApplyEvent::class => ['handleEvent', $priority],
-      PreDestroyEvent::class => ['handleEvent', $priority],
-      PostDestroyEvent::class => ['handleEvent', $priority],
       StatusCheckEvent::class => ['handleEvent', $priority],
     ];
   }

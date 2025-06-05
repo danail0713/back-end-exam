@@ -48,3 +48,11 @@ student_enrollment.config_emails:
     _form: 'Drupal\student_enrollment\Form\NotificationConfigForm'
   requirements:
     _permission: 'access config form'
+
+student_enrollment.log_in_student:
+  path: '/user/login/student'
+  defaults:
+    _title: 'Log In As Student'
+    _form: 'Drupal\student_enrollment\Form\LogInAsStudentForm'
+  requirements:
+    _permission: 'access content'

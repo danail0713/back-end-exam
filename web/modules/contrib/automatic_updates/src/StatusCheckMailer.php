@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates;
 
@@ -11,7 +11,7 @@ use Drupal\package_manager\ValidationResult;
 use Drupal\system\SystemManager;
 
 /**
- * Defines a service to send status check failure e-mails during cron.
+ * Defines a service to send status check failure emails during cron.
  *
  * @internal
  *   This is an internal part of Automatic Updates and may be changed or removed
@@ -41,42 +41,11 @@ final class StatusCheckMailer {
    */
   public const ERRORS_ONLY = 'errors_only';
 
-  /**
-   * The config factory service.
-   *
-   * @var \Drupal\Core\Config\ConfigFactoryInterface
-   */
-  protected ConfigFactoryInterface $configFactory;
-
-  /**
-   * The mail manager service.
-   *
-   * @var \Drupal\Core\Mail\MailManagerInterface
-   */
-  protected MailManagerInterface $mailManager;
-
-  /**
-   * The language manager service.
-   *
-   * @var \Drupal\Core\Language\LanguageManagerInterface
-   */
-  protected LanguageManagerInterface $languageManager;
-
-  /**
-   * Constructs a StatusCheckNotifier object.
-   *
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
-   *   The config factory service.
-   * @param \Drupal\Core\Mail\MailManagerInterface $mail_manager
-   *   The mail manager service.
-   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
-   *   The language manager service.
-   */
-  public function __construct(ConfigFactoryInterface $config_factory, MailManagerInterface $mail_manager, LanguageManagerInterface $language_manager) {
-    $this->configFactory = $config_factory;
-    $this->mailManager = $mail_manager;
-    $this->languageManager = $language_manager;
-  }
+  public function __construct(
+    private readonly ConfigFactoryInterface $configFactory,
+    private readonly MailManagerInterface $mailManager,
+    private readonly LanguageManagerInterface $languageManager,
+  ) {}
 
   /**
    * Sends status check failure notifications if necessary.
@@ -103,7 +72,7 @@ final class StatusCheckMailer {
     // result sets.
     elseif ($level === static::ERRORS_ONLY) {
       $filter = function (ValidationResult $result): bool {
-        return $result->getSeverity() === SystemManager::REQUIREMENT_ERROR;
+        return $result->severity === SystemManager::REQUIREMENT_ERROR;
       };
       $current_results = array_filter($current_results, $filter);
       // If the current results don't have any errors, there's nothing else
@@ -135,7 +104,7 @@ final class StatusCheckMailer {
    * @return bool
    *   TRUE if the given result sets are different; FALSE otherwise.
    */
-  protected function resultsAreDifferent(?array $previous_results, array $current_results): bool {
+  private function resultsAreDifferent(?array $previous_results, array $current_results): bool {
     if ($previous_results === NULL || count($previous_results) !== count($current_results)) {
       return TRUE;
     }
@@ -186,7 +155,7 @@ final class StatusCheckMailer {
    * @return string
    *   The preferred language of the recipient.
    */
-  protected function getEmailLangcode(string $recipient): string {
+  private function getEmailLangcode(string $recipient): string {
     $user = user_load_by_mail($recipient);
     if ($user) {
       return $user->getPreferredLangcode();

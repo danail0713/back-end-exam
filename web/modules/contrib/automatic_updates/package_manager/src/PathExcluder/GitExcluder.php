@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\PathExcluder;
 
-use Drupal\Core\File\FileSystemInterface;
-use Drupal\package_manager\Event\CollectIgnoredPathsEvent;
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\Event\CollectPathsToExcludeEvent;
 use Drupal\package_manager\PathLocator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\Finder\Finder;
 
 /**
  * Excludes .git directories from stage operations.
@@ -20,74 +19,62 @@ use Symfony\Component\Finder\Finder;
  */
 final class GitExcluder implements EventSubscriberInterface {
 
-  use PathExclusionsTrait;
-
-  /**
-   * The file system service.
-   *
-   * @var \Drupal\Core\File\FileSystemInterface
-   */
-  protected $fileSystem;
-
-  /**
-   * Constructs a GitExcluder object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   * @param \Drupal\Core\File\FileSystemInterface $file_system
-   *   The file system service.
-   */
-  public function __construct(PathLocator $path_locator, FileSystemInterface $file_system) {
-    $this->pathLocator = $path_locator;
-    $this->fileSystem = $file_system;
-  }
+  public function __construct(
+    private readonly PathLocator $pathLocator,
+    private readonly ComposerInspector $composerInspector,
+  ) {}
 
   /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
     return [
-      CollectIgnoredPathsEvent::class => 'excludeGitDirectories',
+      CollectPathsToExcludeEvent::class => 'excludeGitDirectories',
     ];
   }
 
   /**
    * Excludes .git directories from stage operations.
    *
-   * @param \Drupal\package_manager\Event\CollectIgnoredPathsEvent $event
+   * @param \Drupal\package_manager\Event\CollectPathsToExcludeEvent $event
    *   The event object.
+   *
+   * @throws \Exception
+   *   See \Drupal\package_manager\ComposerInspector::validate().
    */
-  public function excludeGitDirectories(CollectIgnoredPathsEvent $event): void {
-    // Find all .git directories in the project. We cannot do this with
-    // FileSystemInterface::scanDirectory() because it unconditionally excludes
-    // anything starting with a dot.
-    $finder = Finder::create()
-      ->in($this->pathLocator->getProjectRoot())
-      ->directories()
-      ->name('.git')
-      ->ignoreVCS(FALSE)
-      ->ignoreDotFiles(FALSE);
+  public function excludeGitDirectories(CollectPathsToExcludeEvent $event): void {
+    $project_root = $this->pathLocator->getProjectRoot();
+
+    // To determine which .git directories to exclude, the installed packages
+    // must be known, and that requires Composer commands to be able to run.
+    // This intentionally does not catch exceptions: failed Composer validation
+    // in the project root implies that this excluder cannot function correctly.
+    // Note: the call to ComposerInspector::getInstalledPackagesList() would
+    // also have triggered this, but explicitness is preferred here.
+    // @see \Drupal\package_manager\StatusCheckTrait::runStatusCheck()
+    $this->composerInspector->validate($project_root);
 
     $paths_to_exclude = [];
 
     $installed_paths = [];
     // Collect the paths of every installed package.
-    $installed_packages = $event->getStage()->getActiveComposer()->getInstalledPackagesData();
-    foreach ($installed_packages as $package_data) {
-      if (array_key_exists('install_path', $package_data) && !empty($package_data['install_path'])) {
-        $installed_paths[] = $this->fileSystem->realpath($package_data['install_path']);
+    $installed_packages = $this->composerInspector->getInstalledPackagesList($project_root);
+    foreach ($installed_packages as $package) {
+      if (!empty($package->path)) {
+        $installed_paths[] = $package->path;
       }
     }
-    foreach ($finder as $git_directory) {
+    $paths = $event->scanForDirectoriesByName('.git');
+    foreach ($paths as $git_directory) {
       // Don't exclude any `.git` directory that is directly under an installed
       // package's path, since it means Composer probably installed that package
       // from source and therefore needs the `.git` directory in order to update
       // the package.
-      if (!in_array(dirname((string) $git_directory), $installed_paths, TRUE)) {
-        $paths_to_exclude[] = $git_directory->getPathname();
+      if (!in_array(dirname($git_directory), $installed_paths, TRUE)) {
+        $paths_to_exclude[] = $git_directory;
       }
     }
-    $this->excludeInProjectRoot($event, $paths_to_exclude);
+    $event->addPathsRelativeToProjectRoot($paths_to_exclude);
   }
 
 }

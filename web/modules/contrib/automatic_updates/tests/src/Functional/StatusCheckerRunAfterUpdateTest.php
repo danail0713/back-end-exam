@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -21,7 +21,7 @@ class StatusCheckerRunAfterUpdateTest extends UpdaterFormTestBase {
    * @return bool[][]
    *   The test cases.
    */
-  public function providerStatusCheckerRunAfterUpdate(): array {
+  public static function providerStatusCheckerRunAfterUpdate(): array {
     return [
       'has database updates' => [TRUE],
       'does not have database updates' => [FALSE],
@@ -35,8 +35,6 @@ class StatusCheckerRunAfterUpdateTest extends UpdaterFormTestBase {
    *   Whether the site has database updates or not.
    *
    * @dataProvider providerStatusCheckerRunAfterUpdate
-   *
-   * @requires PHP >= 8.0
    */
   public function testStatusCheckerRunAfterUpdate(bool $has_database_updates) {
     $this->getStageFixtureManipulator()->setCorePackageVersion('9.8.1');
@@ -63,7 +61,7 @@ class StatusCheckerRunAfterUpdateTest extends UpdaterFormTestBase {
       $page->pressButton('Continue');
       $this->checkForMetaRefresh();
       $assert_session->pageTextContainsOnce('An error has occurred.');
-      $assert_session->pageTextContainsOnce('Please continue to the error page');
+      $assert_session->pageTextContainsOnce('Continue to the error page');
       $page->clickLink('the error page');
       $assert_session->pageTextContains('Some modules have database schema updates to install. You should run the database update script immediately.');
       $assert_session->linkExists('database update script');
@@ -77,23 +75,19 @@ class StatusCheckerRunAfterUpdateTest extends UpdaterFormTestBase {
       $page->clickLink('Apply pending updates');
       $this->checkForMetaRefresh();
       $assert_session->pageTextContains('Updates were attempted.');
-      // PendingUpdatesValidator prevented the update to complete, so the status
-      // checks weren't run.
-      $this->drupalGet('/admin');
-      $assert_session->pageTextContains('Your site has not recently run an update readiness check. Rerun readiness checks now.');
     }
     else {
       $page->pressButton('Continue');
       $this->checkForMetaRefresh();
       $assert_session->addressEquals('/admin/reports/updates');
       $assert_session->pageTextContainsOnce('Update complete!');
-      // Status checks should display errors on admin page.
-      $this->drupalGet('/admin');
-      // Confirm that the status checks were run and the new error is displayed.
-      $assert_session->statusMessageContains('Error before continue.', 'error');
-      $assert_session->statusMessageContains(static::$errorsExplanation, 'error');
-      $assert_session->pageTextNotContains('Your site has not recently run an update readiness check. Rerun readiness checks now.');
     }
+    // Status checks should display errors on admin page.
+    $this->drupalGet('/admin');
+    // Confirm that the status checks were run and the new error is displayed.
+    $assert_session->statusMessageContains('Error before continue.', 'error');
+    $assert_session->statusMessageContains('Your site does not pass some readiness checks for automatic updates. It cannot be automatically updated until further action is performed.', 'error');
+    $assert_session->pageTextNotContains('Your site has not recently run an update readiness check. Rerun readiness checks now.');
   }
 
 }

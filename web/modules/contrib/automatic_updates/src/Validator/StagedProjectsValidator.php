@@ -1,14 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Validator;
 
-use Composer\Package\PackageInterface;
-use Drupal\automatic_updates\Updater;
+use Drupal\automatic_updates\UpdateStage;
+use Drupal\package_manager\ComposerInspector;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\StringTranslation\TranslationInterface;
+use Drupal\package_manager\InstalledPackage;
+use Drupal\package_manager\PathLocator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -23,15 +24,10 @@ final class StagedProjectsValidator implements EventSubscriberInterface {
 
   use StringTranslationTrait;
 
-  /**
-   * Constructs a StagedProjectsValidation object.
-   *
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The translation service.
-   */
-  public function __construct(TranslationInterface $translation) {
-    $this->setStringTranslation($translation);
-  }
+  public function __construct(
+    private readonly PathLocator $pathLocator,
+    private readonly ComposerInspector $composerInspector,
+  ) {}
 
   /**
    * Validates the staged packages.
@@ -40,20 +36,14 @@ final class StagedProjectsValidator implements EventSubscriberInterface {
    *   The event object.
    */
   public function validateStagedProjects(PreApplyEvent $event): void {
-    $stage = $event->getStage();
+    $stage = $event->stage;
     // We only want to do this check if the stage belongs to Automatic Updates.
-    if (!$stage instanceof Updater) {
+    if (!$stage instanceof UpdateStage) {
       return;
     }
 
-    try {
-      $active = $stage->getActiveComposer();
-      $stage = $stage->getStageComposer();
-    }
-    catch (\Throwable $e) {
-      $event->addErrorFromThrowable($e);
-      return;
-    }
+    $active_list = $this->composerInspector->getInstalledPackagesList($this->pathLocator->getProjectRoot());
+    $stage_list = $this->composerInspector->getInstalledPackagesList($stage->getStageDirectory());
 
     $type_map = [
       'drupal-module' => $this->t('module'),
@@ -61,23 +51,23 @@ final class StagedProjectsValidator implements EventSubscriberInterface {
       'drupal-theme' => $this->t('theme'),
       'drupal-custom-theme' => $this->t('custom theme'),
     ];
-    $filter = function (PackageInterface $package) use ($type_map): bool {
-      return array_key_exists($package->getType(), $type_map);
+    $filter = function (InstalledPackage $package) use ($type_map): bool {
+      return array_key_exists($package->type, $type_map);
     };
-    $new_packages = $stage->getPackagesNotIn($active);
-    $removed_packages = $active->getPackagesNotIn($stage);
-    $updated_packages = $active->getPackagesWithDifferentVersionsIn($stage);
+    $new_packages = $stage_list->getPackagesNotIn($active_list);
+    $removed_packages = $active_list->getPackagesNotIn($stage_list);
+    $updated_packages = $active_list->getPackagesWithDifferentVersionsIn($stage_list);
 
     // Check if any new Drupal projects were installed.
-    if ($new_packages = array_filter($new_packages, $filter)) {
+    if ($new_packages = array_filter($new_packages->getArrayCopy(), $filter)) {
       $new_packages_messages = [];
 
       foreach ($new_packages as $new_package) {
         $new_packages_messages[] = $this->t(
           "@type '@name' installed.",
           [
-            '@type' => $type_map[$new_package->getType()],
-            '@name' => $new_package->getName(),
+            '@type' => $type_map[$new_package->type],
+            '@name' => $new_package->name,
           ]
         );
       }
@@ -90,14 +80,14 @@ final class StagedProjectsValidator implements EventSubscriberInterface {
     }
 
     // Check if any Drupal projects were removed.
-    if ($removed_packages = array_filter($removed_packages, $filter)) {
+    if ($removed_packages = array_filter($removed_packages->getArrayCopy(), $filter)) {
       $removed_packages_messages = [];
       foreach ($removed_packages as $removed_package) {
         $removed_packages_messages[] = $this->t(
           "@type '@name' removed.",
           [
-            '@type' => $type_map[$removed_package->getType()],
-            '@name' => $removed_package->getName(),
+            '@type' => $type_map[$removed_package->type],
+            '@name' => $removed_package->name,
           ]
         );
       }
@@ -111,28 +101,26 @@ final class StagedProjectsValidator implements EventSubscriberInterface {
 
     // Check if any Drupal projects were neither installed or removed, but had
     // their version numbers changed.
-    if ($updated_packages = array_filter($updated_packages, $filter)) {
-      $staged_packages = $stage->getInstalledPackages();
+    if ($updated_packages = array_filter($updated_packages->getArrayCopy(), $filter)) {
 
+      $version_change_messages = [];
       foreach ($updated_packages as $name => $updated_package) {
         $version_change_messages[] = $this->t(
           "@type '@name' from @active_version to @staged_version.",
           [
-            '@type' => $type_map[$updated_package->getType()],
-            '@name' => $updated_package->getName(),
-            '@staged_version' => $staged_packages[$name]->getPrettyVersion(),
-            '@active_version' => $updated_package->getPrettyVersion(),
+            '@type' => $type_map[$updated_package->type],
+            '@name' => $updated_package->name,
+            '@staged_version' => $stage_list[$name]->version,
+            '@active_version' => $updated_package->version,
           ]
         );
       }
-      if (!empty($version_change_messages)) {
-        $version_change_summary = $this->formatPlural(
-          count($version_change_messages),
-          'The update cannot proceed because the following Drupal project was unexpectedly updated. Only Drupal Core updates are currently supported.',
-          'The update cannot proceed because the following Drupal projects were unexpectedly updated. Only Drupal Core updates are currently supported.'
-        );
-        $event->addError($version_change_messages, $version_change_summary);
-      }
+      $version_change_summary = $this->formatPlural(
+        count($version_change_messages),
+        'The update cannot proceed because the following Drupal project was unexpectedly updated. Only Drupal Core updates are currently supported.',
+        'The update cannot proceed because the following Drupal projects were unexpectedly updated. Only Drupal Core updates are currently supported.'
+      );
+      $event->addError($version_change_messages, $version_change_summary);
     }
   }
 

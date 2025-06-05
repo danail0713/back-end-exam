@@ -1,22 +1,22 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates_extensions\Kernel;
 
-use Drupal\automatic_updates\Exception\UpdateException;
-use Drupal\automatic_updates_extensions\ExtensionUpdater;
-use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\package_manager\UnusedConfigFactory;
+use Drupal\automatic_updates_extensions\ExtensionUpdateStage;
+use Drupal\fixture_manipulator\ActiveFixtureManipulator;
+use Drupal\package_manager\Event\PreOperationStageEvent;
+use Drupal\package_manager\Exception\StageEventException;
+use Drupal\package_manager\Validator\ComposerValidator;
 use Drupal\Tests\automatic_updates\Kernel\AutomaticUpdatesKernelTestBase;
-use Drupal\Tests\package_manager\Kernel\TestStageTrait;
-use Drupal\Tests\package_manager\Kernel\TestStageValidationException;
-use PhpTuf\ComposerStager\Infrastructure\Factory\Path\PathFactory;
 
 /**
  * Base class for kernel tests of the Automatic Updates Extensions module.
  *
  * @internal
+ *   This class is an internal part of the module's testing infrastructure and
+ *   should not be used by external code.
  */
 abstract class AutomaticUpdatesExtensionsKernelTestBase extends AutomaticUpdatesKernelTestBase {
 
@@ -37,36 +37,40 @@ abstract class AutomaticUpdatesExtensionsKernelTestBase extends AutomaticUpdates
     // server. This should be okay in most situations because, apart from the
     // validator, only Composer Stager needs run Composer, and
     // package_manager_bypass is disabling those operations.
-    $this->disableValidators[] = 'package_manager.validator.composer_executable';
+    $this->disableValidators[] = ComposerValidator::class;
     parent::setUp();
-  }
-
-  /**
-   * Create Test Project.
-   *
-   * @param string|null $source_dir
-   *   Source directory.
-   */
-  protected function createTestProject(?string $source_dir = NULL): void {
-    $source_dir = $source_dir ?? __DIR__ . '/../../fixtures/fake-site';
-    parent::createTestProject($source_dir);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function register(ContainerBuilder $container) {
-    parent::register($container);
-
-    // Use the test-only implementations of the regular and cron updaters.
-    $overrides = [
-      'automatic_updates_extensions.updater' => TestExtensionUpdater::class,
-    ];
-    foreach ($overrides as $service_id => $class) {
-      if ($container->hasDefinition($service_id)) {
-        $container->getDefinition($service_id)->setClass($class);
-      }
-    }
+    // Install additional packages that will be needed in tests.
+    (new ActiveFixtureManipulator())
+      ->addPackage([
+        "name" => "drupal/my_module",
+        "version" => "9.8.0",
+        "type" => "drupal-module",
+      ])
+      ->addPackage([
+        "name" => "drupal/contrib_profile1",
+        "version" => "1.0.0",
+        "type" => "drupal-profile",
+      ])
+      ->addPackage([
+        "name" => "drupal/my_dev_module",
+        "version" => "9.8.1",
+        "type" => "drupal-module",
+      ], TRUE)
+      ->addPackage([
+        "name" => "drupal/semver_test",
+        "version" => "8.1.0",
+        "type" => "drupal-module",
+      ])
+      ->addPackage([
+        "name" => "drupal/aaa_update_test",
+        "version" => "1.0.0",
+        "type" => "drupal-module",
+      ])
+      ->addPackage([
+        "name" => "drupal/package_manager_test_update",
+        "version" => "1.0.0",
+        "type" => "drupal-module",
+      ])->commitChanges();
   }
 
   /**
@@ -80,60 +84,26 @@ abstract class AutomaticUpdatesExtensionsKernelTestBase extends AutomaticUpdates
    *   (optional) The class of the event which should return the results. Must
    *   be passed if $expected_results is not empty.
    */
-  protected function assertUpdateResults(array $project_versions, array $expected_results, string $event_class = NULL): void {
-    $updater = $this->createExtensionUpdater();
+  protected function assertUpdateResults(array $project_versions, array $expected_results, ?string $event_class = NULL): void {
+    $stage = $this->container->get(ExtensionUpdateStage::class);
 
     try {
-      $updater->begin($project_versions);
-      $updater->stage();
-      $updater->apply();
-      $updater->postApply();
-      $updater->destroy();
+      $stage->begin($project_versions);
+      $stage->stage();
+      $stage->apply();
+      $stage->postApply();
+      $stage->destroy();
 
       // If we did not get an exception, ensure we didn't expect any results.
       $this->assertEmpty($expected_results);
     }
-    catch (TestStageValidationException $e) {
+    catch (StageEventException $e) {
       $this->assertNotEmpty($expected_results);
-      $this->assertValidationResultsEqual($expected_results, $e->getResults());
-      // TestStage::dispatch() throws TestUpdateException with event object
-      // so that we can analyze it.
-      $this->assertInstanceOf(UpdateException::class, $e->getOriginalException());
-      $this->assertNotEmpty($event_class);
-      $this->assertInstanceOf($event_class, $e->getEvent());
+      $exception_event = $e->event;
+      $this->assertInstanceOf($event_class, $exception_event);
+      $this->assertInstanceOf(PreOperationStageEvent::class, $exception_event);
+      $this->assertValidationResultsEqual($expected_results, $e->event->getResults());
     }
   }
-
-  /**
-   * Creates an extension updater object for testing purposes.
-   *
-   * @return \Drupal\Tests\automatic_updates_extensions\Kernel\TestExtensionUpdater
-   *   A extension updater object, with test-only modifications.
-   */
-  protected function createExtensionUpdater(): TestExtensionUpdater {
-    return new TestExtensionUpdater(
-      // @todo Remove this in https://www.drupal.org/i/3303167
-      new UnusedConfigFactory(),
-      $this->container->get('package_manager.path_locator'),
-      $this->container->get('package_manager.beginner'),
-      $this->container->get('package_manager.stager'),
-      $this->container->get('package_manager.committer'),
-      $this->container->get('file_system'),
-      $this->container->get('event_dispatcher'),
-      $this->container->get('tempstore.shared'),
-      $this->container->get('datetime.time'),
-      new PathFactory(),
-      $this->container->get('package_manager.failure_marker')
-    );
-  }
-
-}
-
-/**
- * A test-only version of the regular extension updater to override internals.
- */
-class TestExtensionUpdater extends ExtensionUpdater {
-
-  use TestStageTrait;
 
 }

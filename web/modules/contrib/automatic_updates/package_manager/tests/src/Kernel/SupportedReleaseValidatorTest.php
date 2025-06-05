@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
@@ -33,26 +33,34 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
         'name' => "drupal/semver_test",
         'version' => '8.1.0',
         'type' => 'drupal-module',
-        'install_path' => '../../modules/semver_test',
       ])
       ->addPackage([
         'name' => "drupal/aaa_update_test",
         'version' => '2.0.0',
         'type' => 'drupal-module',
-        'install_path' => '../../modules/aaa_update_test',
       ])
       ->addPackage([
         'name' => "drupal/package_manager_theme",
         'version' => '8.1.0',
         'type' => 'drupal-theme',
-        'install_path' => '../../modules/package_manager_theme',
       ])
       ->addPackage([
         'name' => "somewhere/a_drupal_module",
         'version' => '8.1.0',
         'type' => 'drupal-module',
-        'install_path' => '../../modules/a_drupal_module',
       ])
+      ->addPackage(
+          [
+            'name' => "drupal/module_no_project",
+            'version' => '1.0.0',
+            'type' => 'drupal-module',
+          ],
+          FALSE,
+          FALSE,
+          [
+            'module_no_project.info.yml' => '{name: "Module No Project", type: "module"}',
+          ],
+      )
       ->commitChanges();
   }
 
@@ -62,7 +70,7 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
    * @return mixed[][]
    *   The test cases.
    */
-  public function providerException(): array {
+  public static function providerException(): array {
     $release_fixture_folder = __DIR__ . '/../../fixtures/release-history';
     $summary = t('Cannot update because the following project version is not in the list of installable releases.');
     return [
@@ -75,7 +83,6 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/semver_test",
           'version' => '8.1.1',
           'type' => 'drupal-module',
-          'install_path' => NULL,
         ],
         [],
       ],
@@ -88,7 +95,6 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/semver_test",
           'version' => '8.2.0',
           'type' => 'drupal-module',
-          'install_path' => NULL,
         ],
         [
           ValidationResult::createError([t('semver_test (drupal/semver_test) 8.2.0')], $summary),
@@ -103,7 +109,6 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/aaa_update_test",
           'version' => '2.1.0',
           'type' => 'drupal-module',
-          'install_path' => NULL,
         ],
         [],
       ],
@@ -116,37 +121,34 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/aaa_update_test",
           'version' => '3.0.0',
           'type' => 'drupal-module',
-          'install_path' => NULL,
         ],
         [
           ValidationResult::createError([t('aaa_update_test (drupal/aaa_update_test) 3.0.0')], $summary),
         ],
       ],
-      'aaa_automatic_updates_test(not in active), update to unsupported branch' => [
+      'package_manager_test_update(not in active), update to unsupported branch' => [
         [
-          'aaa_automatic_updates_test' => "$release_fixture_folder/aaa_automatic_updates_test.7.0.1.xml",
+          'package_manager_test_update' => "$release_fixture_folder/package_manager_test_update.7.0.1.xml",
         ],
         FALSE,
         [
-          'name' => "drupal/aaa_automatic_updates_test",
+          'name' => "drupal/package_manager_test_update",
           'version' => '7.0.1-dev',
           'type' => 'drupal-module',
-          'install_path' => '../../modules/aaa_automatic_updates_test',
         ],
         [
-          ValidationResult::createError([t('aaa_automatic_updates_test (drupal/aaa_automatic_updates_test) 7.0.1-dev')], $summary),
+          ValidationResult::createError([t('package_manager_test_update (drupal/package_manager_test_update) 7.0.1-dev')], $summary),
         ],
       ],
-      'aaa_automatic_updates_test(not in active), update to supported branch' => [
+      'package_manager_test_update(not in active), update to supported branch' => [
         [
-          'aaa_automatic_updates_test' => "$release_fixture_folder/aaa_automatic_updates_test.7.0.1.xml",
+          'package_manager_test_update' => "$release_fixture_folder/package_manager_test_update.7.0.1.xml",
         ],
         FALSE,
         [
-          'name' => "drupal/aaa_automatic_updates_test",
+          'name' => "drupal/package_manager_test_update",
           'version' => '7.0.1',
           'type' => 'drupal-module',
-          'install_path' => '../../modules/aaa_automatic_updates_test',
         ],
         [],
       ],
@@ -159,7 +161,6 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/package_manager_theme",
           'version' => '8.1.1',
           'type' => 'drupal-theme',
-          'install_path' => NULL,
         ],
         [],
       ],
@@ -172,10 +173,9 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "drupal/package_manager_theme",
           'version' => '8.2.0',
           'type' => 'drupal-theme',
-          'install_path' => NULL,
         ],
         [
-          ValidationResult::createError(['package_manager_theme (drupal/package_manager_theme) 8.2.0'], $summary),
+          ValidationResult::createError([t('package_manager_theme (drupal/package_manager_theme) 8.2.0')], $summary),
         ],
       ],
       // For modules that don't start with 'drupal/' will not have update XML
@@ -188,9 +188,20 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
           'name' => "somewhere/a_drupal_module",
           'version' => '8.1.1',
           'type' => 'drupal-module',
-          'install_path' => NULL,
         ],
         [],
+      ],
+      'updating a module that does not have project info' => [
+        [],
+        TRUE,
+        [
+          'name' => "drupal/module_no_project",
+          'version' => '1.1.0',
+          'type' => 'drupal-module',
+        ],
+        [
+          ValidationResult::createError([t('Cannot update because the following new or updated Drupal package does not have project information: drupal/module_no_project')]),
+        ],
       ],
     ];
   }
@@ -224,6 +235,9 @@ class SupportedReleaseValidatorTest extends PackageManagerKernelTestBase {
     // @see \Drupal\package_manager\Validator\SupportedReleaseValidator::checkStagedReleases()
     $stage_manipulator->setVersion('drupal/dependency', '9.8.1');
     $this->assertResults($expected_results, PreApplyEvent::class);
+    // Ensure that any errors arising from invalid project info (which we expect
+    // in this test) will not fail the test during tear-down.
+    $this->failureLogger->reset();
   }
 
 }

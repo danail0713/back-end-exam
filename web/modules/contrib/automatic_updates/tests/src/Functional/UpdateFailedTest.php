@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Functional;
 
@@ -24,28 +24,28 @@ class UpdateFailedTest extends UpdaterFormTestBase {
     $this->mockActiveCoreVersion('9.8.0');
     $this->checkForUpdates();
 
-    $this->drupalGet('/admin/modules/automatic-update');
+    $this->drupalGet('/admin/modules/update');
     $assert_session->pageTextNotContains(static::$errorsExplanation);
     $assert_session->pageTextNotContains(static::$warningsExplanation);
     $page->pressButton('Update to 9.8.1');
     $this->checkForMetaRefresh();
     $this->assertUpdateStagedTimes(1);
 
-    LoggingCommitter::setException(new \Exception('failed at committer'));
+    LoggingCommitter::setException(\Exception::class, 'failed at committer');
     $page->pressButton('Continue');
     $this->checkForMetaRefresh();
+    $failure_message = 'Automatic updates failed to apply, and the site is in an indeterminate state. Consider restoring the code and database from a backup.';
     $assert_session->pageTextContainsOnce('An error has occurred.');
-    $assert_session->pageTextContains("The update operation failed to apply completely. All the files necessary to run Drupal correctly and securely are probably not present. It is strongly recommended to restore your site's code and database from a backup.");
+    $assert_session->pageTextContains($failure_message);
     $page->clickLink('the error page');
 
-    $failure_message = 'Automatic updates failed to apply, and the site is in an indeterminate state. Consider restoring the code and database from a backup.';
     // We should be on the form (i.e., 200 response code), but unable to
     // continue the update.
     $assert_session->statusCodeEquals(200);
     $assert_session->pageTextContains($failure_message);
     $assert_session->buttonNotExists('Continue');
     // The same thing should be true if we try to start from the beginning.
-    $this->drupalGet('/admin/modules/automatic-update');
+    $this->drupalGet('/admin/modules/update');
     $assert_session->statusCodeEquals(200);
     $assert_session->pageTextContains($failure_message);
     $assert_session->buttonNotExists('Update');

@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\PathExcluder;
 
-use Drupal\package_manager\Event\CollectIgnoredPathsEvent;
+use Drupal\package_manager\Event\CollectPathsToExcludeEvent;
 use Drupal\package_manager\PathLocator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -18,39 +18,29 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  */
 final class VendorHardeningExcluder implements EventSubscriberInterface {
 
-  use PathExclusionsTrait;
-
-  /**
-   * Constructs a VendorHardeningExcluder object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   */
-  public function __construct(PathLocator $path_locator) {
-    $this->pathLocator = $path_locator;
-  }
+  public function __construct(private readonly PathLocator $pathLocator) {}
 
   /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
     return [
-      CollectIgnoredPathsEvent::class => 'excludeVendorHardeningFiles',
+      CollectPathsToExcludeEvent::class => 'excludeVendorHardeningFiles',
     ];
   }
 
   /**
    * Excludes vendor hardening files from stage operations.
    *
-   * @param \Drupal\package_manager\Event\CollectIgnoredPathsEvent $event
+   * @param \Drupal\package_manager\Event\CollectPathsToExcludeEvent $event
    *   The event object.
    */
-  public function excludeVendorHardeningFiles(CollectIgnoredPathsEvent $event): void {
+  public function excludeVendorHardeningFiles(CollectPathsToExcludeEvent $event): void {
     // If the core-vendor-hardening plugin (used in the legacy-project template)
     // is present, it may have written security hardening files in the vendor
-    // directory. They should always be ignored.
+    // directory. They should always be excluded.
     $vendor_dir = $this->pathLocator->getVendorDirectory();
-    $this->excludeInProjectRoot($event, [
+    $event->addPathsRelativeToProjectRoot([
       $vendor_dir . '/web.config',
       $vendor_dir . '/.htaccess',
     ]);

@@ -1,0 +1,4 @@
+access add theme form:
+  title: 'Access add theme form.'
+  description: 'Allows administrators access the add theme form.'
+  restrict access: true

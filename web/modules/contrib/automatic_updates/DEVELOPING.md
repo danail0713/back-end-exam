@@ -7,7 +7,7 @@ A simple setup is enough for most users to start contributing to Automatic Updat
 Assuming you meet the [system requirements](#system-requirements), simply run the following command <sup>[[1]](#footnote-1), [[2]](#footnote-2)</sup> from the directory you would like to install your development environment under <sup>[[3]](#footnote-3)</sup>. It will prompt for confirmation before beginning.
 
 ```shell
-/bin/bash -c "$(curl -fsSL https://git.drupalcode.org/project/automatic_updates/-/raw/8.x-2.x/scripts/setup_local_dev.sh)"
+/bin/bash -c "$(curl -fsSL https://git.drupalcode.org/project/automatic_updates/-/raw/3.0.x/scripts/setup_local_dev.sh)"
 ```
 
 That's it. The success message will display next steps.
@@ -26,38 +26,35 @@ That's it. The success message will display next steps.
 
 ### System requirements
 * A *nix-based operating system, such as Linux or macOS.
-* PHP 7.4 or later.
+* Drupal 10 or later.
 * Composer 2 or later. (Automatic Updates is not compatible with Composer 1.)
 * Git must be installed.
-
-### Caveats
-* Symbolic links are not currently supported by Package Manager. If the Drupal core checkout created during setup below contains any, tests will not work. By default, there shouldn't be any, but some may exist in certain situations (for example, if Drush or Drupal core's JavaScript dependencies have been installed).<br>
-  <br>
-  To scan for symbolic links, run `find . -type l` from the Drupal core repository root. If you find any, try to identify their source and eliminate it (for example, by removing a Composer library that places them).
 
 ### Customizing your setup
 Several details of your setup can be customized via environment variables. Set these before running [the installation command above](#local-development-environment-setup).
 
 ```shell
-DRUPAL_CORE_BRANCH="9.5.x" # The branch of Drupal core that will be installed.
+DRUPAL_CORE_BRANCH="10.0.x" # The branch of Drupal core that will be installed.
 DRUPAL_CORE_SHALLOW_CLONE="TRUE" # Whether or not to do a "shallow clone" of Drupal core. (Defaults to TRUE.) See note below.
-AUTOMATIC_UPDATES_BRANCH="8.x-2.x" # The branch of the Automatic Updates module that will be installed.
+AUTOMATIC_UPDATES_BRANCH="3.0.x" # The branch of the Automatic Updates module that will be installed.
 SITE_DIRECTORY="auto_updates_dev" # The path to the directory where the dev environment will be installed.
 SITE_HOST=".test" # The path for Drupal's TRUSTED_HOST_PATTERN.
 ```
 
 Note: A shallow Git clone is much smaller and therefore faster, but it removes the ability to do debugging operations such as `git bisect` or `git blame`. To recover these abilities, [you can convert your repository to a full clone after the fact](https://stackoverflow.com/questions/6802145/how-to-convert-a-git-shallow-clone-to-a-full-clone):
 
+// cSpell:disable
 ```shell
 cd auto-updates-dev
 git fetch --unshallow
 ```
+// cSpell:enable
 
 ### Alternative setup options
 You can download the setup script first to review its contents or modify it before running it:
 
 ```shell
-curl --output setup_local_dev.sh https://git.drupalcode.org/project/automatic_updates/-/raw/8.x-2.x/scripts/setup_local_dev.sh
+curl --output setup_local_dev.sh https://git.drupalcode.org/project/automatic_updates/-/raw/3.0.x/scripts/setup_local_dev.sh
 
 ./scripts/setup_local_dev.sh
 ```
@@ -80,7 +77,7 @@ To set up your environment manually, use the setup script as a reference.
 
 ---
 
-<a name="footnote-1"><sup>1</sup></a> When running a script downloaded from the Web, it is always wise to read its contents first. Ours ([`setup_local_dev.sh`](https://git.drupalcode.org/project/automatic_updates/-/raw/8.x-2.x/scripts/setup_local_dev.sh)) is documented with code comments to help with that. For a more cautious approach, see [Alternative setup options](#alternative-setup-options) above.
+<a name="footnote-1"><sup>1</sup></a> When running a script downloaded from the Web, it is always wise to read its contents first. Ours ([`setup_local_dev.sh`](https://git.drupalcode.org/project/automatic_updates/-/raw/3.0.x/scripts/setup_local_dev.sh)) is documented with code comments to help with that. For a more cautious approach, see [Alternative setup options](#alternative-setup-options) above.
 
 <a name="footnote-2"><sup>2</sup></a> Curl options explained:
 [`-f, --fail`](https://curl.se/docs/manpage.html#-f),

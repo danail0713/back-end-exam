@@ -47,7 +47,7 @@ class StudentEnrollmentForm extends FormBase {
       throw new AccessDeniedHttpException(); /* throws new exception for denied access to the current page.
       The 403 page is displaying.*/
     }
-    
+
      // Build the enrollment form elements here.
      $course_name = Node::load($course_id)->label();
     $form['course'] = [
@@ -88,7 +88,7 @@ class StudentEnrollmentForm extends FormBase {
       if ($now_date < $course_start_date) {
         // Record the enrollment.
         $this->recordEnrollment($user_id, $course_id);
-        $this->messenger()->addMessage($this->t('Enrollment successful.'));
+        $this->messenger()->addMessage($this->t('Enrollment successfull.'));
         //$this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
       } else if ($now_date >= $course_start_date && $now_date <= $course_end_date) {
         $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');

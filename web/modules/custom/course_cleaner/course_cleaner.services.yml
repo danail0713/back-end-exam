@@ -1,0 +1,6 @@
+services:
+  course_cleaner.event_subscriber:
+    class: Drupal\course_cleaner\EventSubscriber\OnCourseDeleteSubscriber
+    arguments: ['@messenger', '@state']
+    tags:
+      - { name: event_subscriber }

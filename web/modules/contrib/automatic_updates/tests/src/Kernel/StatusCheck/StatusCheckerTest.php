@@ -1,13 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\automatic_updates\Kernel\StatusCheck;
 
-use Drupal\automatic_updates\CronUpdater;
-use Drupal\automatic_updates\Updater;
+use Drupal\automatic_updates\CronUpdateRunner;
+use Drupal\automatic_updates\ConsoleUpdateStage;
+use Drupal\automatic_updates\UpdateStage;
+use Drupal\automatic_updates\Validation\StatusChecker;
+use Drupal\automatic_updates\Validator\StagedProjectsValidator;
 use Drupal\automatic_updates_test\EventSubscriber\TestSubscriber1;
-use Drupal\automatic_updates_test2\EventSubscriber\TestSubscriber2;
+use Drupal\automatic_updates_test_status_checker\EventSubscriber\TestSubscriber2;
+use Drupal\Core\Config\ConfigInstallerInterface;
+use Drupal\Core\Extension\ModuleInstallerInterface;
+use Drupal\Core\Installer\InstallerKernel;
 use Drupal\package_manager\Event\StatusCheckEvent;
 use Drupal\system\SystemManager;
 use Drupal\Tests\automatic_updates\Kernel\AutomaticUpdatesKernelTestBase;
@@ -49,7 +55,7 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
    */
   public function testGetResults(): void {
     $this->container->get('module_installer')
-      ->install(['automatic_updates', 'automatic_updates_test2']);
+      ->install(['automatic_updates', 'automatic_updates_test_status_checker']);
     $this->assertCheckerResultsFromManager([], TRUE);
     $checker_1_expected = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     $checker_2_expected = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
@@ -115,7 +121,7 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     $checker_2_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($checker_1_results, StatusCheckEvent::class);
     TestSubscriber2::setTestResult($checker_2_results, StatusCheckEvent::class);
-    $this->container->get('module_installer')->install(['automatic_updates_test2']);
+    $this->container->get('module_installer')->install(['automatic_updates_test_status_checker']);
     $expected_results_all = array_merge($checker_1_results, $checker_2_results);
     $this->assertCheckerResultsFromManager($expected_results_all);
 
@@ -140,7 +146,7 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     TestSubscriber2::setTestResult($checker_2_results, StatusCheckEvent::class);
     // Confirm that messages from existing modules are displayed when
     // 'automatic_updates' is installed.
-    $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test2', 'help']);
+    $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test_status_checker', 'help']);
     $expected_results_all = array_merge($checker_1_results, $checker_2_results);
     $this->assertCheckerResultsFromManager($expected_results_all);
 
@@ -150,7 +156,7 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     $checker_2_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($checker_1_results, StatusCheckEvent::class);
     TestSubscriber2::setTestResult($checker_2_results, StatusCheckEvent::class);
-    $this->container->get('module_installer')->uninstall(['automatic_updates_test2']);
+    $this->container->get('module_installer')->uninstall(['automatic_updates_test_status_checker']);
     $this->assertCheckerResultsFromManager($checker_1_results);
 
     // Confirm that the checkers are run when a module that does not provide a
@@ -168,12 +174,12 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
   public function testRunIfNeeded(): void {
     $expected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($expected_results, StatusCheckEvent::class);
-    $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test2']);
+    $this->container->get('module_installer')->install(['automatic_updates', 'automatic_updates_test_status_checker']);
     $this->assertCheckerResultsFromManager($expected_results);
 
     $unexpected_results = [$this->createValidationResult(SystemManager::REQUIREMENT_ERROR)];
     TestSubscriber1::setTestResult($unexpected_results, StatusCheckEvent::class);
-    $manager = $this->container->get('automatic_updates.status_checker');
+    $manager = $this->container->get(StatusChecker::class);
     // Confirm that the new results will not be returned because the checkers
     // will not be run.
     $manager->runIfNoStoredResults();
@@ -202,17 +208,17 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     $this->enableModules(['automatic_updates']);
     $stage = NULL;
     $listener = function (StatusCheckEvent $event) use (&$stage): void {
-      $stage = $event->getStage();
+      $stage = $event->stage;
     };
     $this->addEventTestListener($listener, StatusCheckEvent::class);
-    $this->container->get('automatic_updates.status_checker')->run();
+    $this->container->get(StatusChecker::class)->run();
     // By default, updates will be enabled on cron.
-    $this->assertInstanceOf(CronUpdater::class, $stage);
+    $this->assertInstanceOf(ConsoleUpdateStage::class, $stage);
     $this->config('automatic_updates.settings')
-      ->set('cron', CronUpdater::DISABLED)
+      ->set('unattended.level', CronUpdateRunner::DISABLED)
       ->save();
-    $this->container->get('automatic_updates.status_checker')->run();
-    $this->assertInstanceOf(Updater::class, $stage);
+    $this->container->get(StatusChecker::class)->run();
+    $this->assertInstanceOf(UpdateStage::class, $stage);
   }
 
   /**
@@ -232,8 +238,7 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     TestSubscriber1::setTestResult($results, StatusCheckEvent::class);
 
     // Ensure that the validation manager collects the warning.
-    /** @var \Drupal\automatic_updates\Validation\StatusChecker $manager */
-    $manager = $this->container->get('automatic_updates.status_checker')
+    $manager = $this->container->get(StatusChecker::class)
       ->run();
     $this->assertValidationResultsEqual($results, $manager->getResults());
     TestSubscriber1::setTestResult(NULL, StatusCheckEvent::class);
@@ -241,24 +246,18 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
     // results should be stored.
     $this->assertValidationResultsEqual($results, $manager->getResults());
 
-    // Don't validate staged projects or scaffold file permissions because
-    // actual stage operations are bypassed by package_manager_bypass, which
-    // will make these validators complain that there is no actual Composer data
-    // for them to inspect.
-    $validators = array_map([$this->container, 'get'], [
-      'automatic_updates.staged_projects_validator',
-      'automatic_updates.validator.scaffold_file_permissions',
-    ]);
-    $event_dispatcher = $this->container->get('event_dispatcher');
-    array_walk($validators, [$event_dispatcher, 'removeSubscriber']);
+    // Don't validate staged projects because actual stage operations are
+    // bypassed by package_manager_bypass, which will make this validator
+    // complain that there is no actual Composer data for it to inspect.
+    $validator = $this->container->get(StagedProjectsValidator::class);
+    $this->container->get('event_dispatcher')->removeSubscriber($validator);
 
-    /** @var \Drupal\automatic_updates\Updater $updater */
-    $updater = $this->container->get('automatic_updates.updater');
-    $updater->begin(['drupal' => '9.8.1']);
-    $updater->stage();
-    $updater->apply();
-    $updater->postApply();
-    $updater->destroy();
+    $stage = $this->container->get(UpdateStage::class);
+    $stage->begin(['drupal' => '9.8.1']);
+    $stage->stage();
+    $stage->apply();
+    $stage->postApply();
+    $stage->destroy();
 
     // The status validation manager shouldn't have any stored results.
     $this->assertEmpty($manager->getResults());
@@ -285,6 +284,59 @@ class StatusCheckerTest extends AutomaticUpdatesKernelTestBase {
       ->set('executables.composer', '/path/to/composer')
       ->save();
     $this->assertNull($this->getResultsFromManager(FALSE));
+  }
+
+  /**
+   * @covers ::getLastRunTime
+   */
+  public function testLastRunTime(): void {
+    $this->enableModules(['automatic_updates']);
+
+    /** @var \Drupal\automatic_updates\Validation\StatusChecker $status_checker */
+    $status_checker = $this->container->get(StatusChecker::class);
+    $this->assertNull($status_checker->getLastRunTime());
+    $status_checker->run();
+    $last_run_time = $status_checker->getLastRunTime();
+    $this->assertIsInt($last_run_time);
+    $status_checker->clearStoredResults();
+    // The last run time should be unaffected by clearing stored results.
+    $this->assertSame($last_run_time, $status_checker->getLastRunTime());
+  }
+
+  /**
+   * Tests that status checks are not run during site installation.
+   */
+  public function testNoStatusCheckOnSiteInstall(): void {
+    $this->enableModules(['automatic_updates']);
+
+    $GLOBALS['install_state'] = [];
+    $this->assertTrue(InstallerKernel::installationAttempted());
+
+    $this->container->get(ModuleInstallerInterface::class)
+      ->install(['automatic_updates_test_status_checker']);
+    // Ensure that status checks have never been run.
+    $this->assertNull($this->container->get(StatusChecker::class)->getLastRunTime());
+  }
+
+  /**
+   * Tests that status checks are not run during config sync.
+   */
+  public function testNoStatusCheckOnConfigSync(): void {
+    $this->enableModules(['automatic_updates']);
+
+    /** @var \Drupal\Core\Config\StorageInterface $storage */
+    $storage = $this->container->get('config.storage');
+
+    $is_syncing = $this->container->get(ConfigInstallerInterface::class)
+      ->setSourceStorage($storage)
+      ->setSyncing(TRUE)
+      ->isSyncing();
+    $this->assertTrue($is_syncing);
+
+    $this->container->get(ModuleInstallerInterface::class)
+      ->install(['automatic_updates_test_status_checker']);
+    // Ensure that status checks have never been run.
+    $this->assertNull($this->container->get(StatusChecker::class)->getLastRunTime());
   }
 
 }

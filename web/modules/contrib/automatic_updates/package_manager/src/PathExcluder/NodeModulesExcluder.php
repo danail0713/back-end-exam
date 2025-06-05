@@ -1,13 +1,11 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\PathExcluder;
 
-use Drupal\package_manager\Event\CollectIgnoredPathsEvent;
-use Drupal\package_manager\PathLocator;
+use Drupal\package_manager\Event\CollectPathsToExcludeEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\Finder\Finder;
 
 /**
  * Excludes node_modules files from stage directories.
@@ -19,36 +17,14 @@ use Symfony\Component\Finder\Finder;
  */
 class NodeModulesExcluder implements EventSubscriberInterface {
 
-  use PathExclusionsTrait;
-
-  /**
-   * Constructs a NodeModulesExcluder object.
-   *
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   */
-  public function __construct(PathLocator $path_locator) {
-    $this->pathLocator = $path_locator;
-  }
-
   /**
    * Excludes node_modules directories from stage operations.
    *
-   * @param \Drupal\package_manager\Event\CollectIgnoredPathsEvent $event
+   * @param \Drupal\package_manager\Event\CollectPathsToExcludeEvent $event
    *   The event object.
    */
-  public function excludeNodeModulesFiles(CollectIgnoredPathsEvent $event): void {
-    $finder = Finder::create()
-      ->in($this->pathLocator->getProjectRoot())
-      ->directories()
-      ->name('node_modules')
-      ->ignoreVCS(FALSE)
-      ->ignoreDotFiles(FALSE);
-    $paths = [];
-    foreach ($finder as $directory) {
-      $paths[] = $directory->getPathname();
-    }
-    $this->excludeInProjectRoot($event, $paths);
+  public function excludeNodeModulesFiles(CollectPathsToExcludeEvent $event): void {
+    $event->addPathsRelativeToProjectRoot($event->scanForDirectoriesByName('node_modules'));
   }
 
   /**
@@ -56,7 +32,7 @@ class NodeModulesExcluder implements EventSubscriberInterface {
    */
   public static function getSubscribedEvents(): array {
     return [
-      CollectIgnoredPathsEvent::class => 'excludeNodeModulesFiles',
+      CollectPathsToExcludeEvent::class => 'excludeNodeModulesFiles',
     ];
   }
 

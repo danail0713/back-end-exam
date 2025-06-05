@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Traits;
 
@@ -75,7 +75,7 @@ trait AssertPreconditionsTrait {
     // If the failure marker exists, it will be in the project root. The project
     // root is defined as the directory containing the `vendor` directory.
     // @see \Drupal\package_manager\FailureMarker::getPath()
-    $failure_marker = static::getProjectRoot() . '/PACKAGE_MANAGER_FAILURE.json';
+    $failure_marker = static::getProjectRoot() . '/PACKAGE_MANAGER_FAILURE.yml';
     if (file_exists($failure_marker)) {
       $suffix = $when === 'before'
         ? 'Remove it to continue.'
@@ -97,12 +97,8 @@ trait AssertPreconditionsTrait {
     // ::setUpBeforeClass is), so it can't just get the container from an
     // instance member.
     // Use reflection to extract the vendor directory from the class loader.
-    $class_loader = $GLOBALS['loader'];
-    assert($class_loader instanceof ClassLoader);
-    $object = new \ReflectionObject($class_loader);
-    $property = $object->getProperty('vendorDir');
-    $property->setAccessible(TRUE);
-    $vendor_directory = $property->getValue($class_loader);
+    $class_loaders = ClassLoader::getRegisteredLoaders();
+    $vendor_directory = key($class_loaders);
     return dirname($vendor_directory);
   }
 

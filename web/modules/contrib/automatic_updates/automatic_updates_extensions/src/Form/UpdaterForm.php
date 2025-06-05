@@ -1,23 +1,26 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates_extensions\Form;
 
 use Drupal\automatic_updates\Form\UpdateFormBase;
 use Drupal\automatic_updates_extensions\BatchProcessor;
-use Drupal\automatic_updates_extensions\ExtensionUpdater;
+use Drupal\automatic_updates_extensions\ExtensionUpdateStage;
 use Drupal\Core\Batch\BatchBuilder;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Url;
-use Drupal\package_manager\Exception\ApplyFailedException;
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\Exception\StageFailureMarkerException;
 use Drupal\package_manager\FailureMarker;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ProjectInfo;
 use Drupal\package_manager\ValidationResult;
 use Drupal\system\SystemManager;
+use Drupal\update\ProjectRelease;
 use Drupal\update\UpdateManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -26,79 +29,34 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * A form for selecting extension updates.
  *
  * @internal
- *   Form classes are internal.
+ *   Form classes are internal and should not be used by external code.
  */
 final class UpdaterForm extends UpdateFormBase {
-
-  /**
-   * The extension updater service.
-   *
-   * @var \Drupal\automatic_updates_extensions\ExtensionUpdater
-   */
-  private $extensionUpdater;
-
-  /**
-   * The event dispatcher service.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  private $eventDispatcher;
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  private $state;
-
-  /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  private $renderer;
-
-  /**
-   * Failure marker service.
-   *
-   * @var \Drupal\package_manager\FailureMarker
-   */
-  private $failureMarker;
 
   /**
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('automatic_updates_extensions.updater'),
+      $container->get(ExtensionUpdateStage::class),
       $container->get('event_dispatcher'),
       $container->get('renderer'),
       $container->get('state'),
-      $container->get('package_manager.failure_marker')
+      $container->get(FailureMarker::class),
+      $container->get(ComposerInspector::class),
+      $container->get(PathLocator::class),
     );
   }
 
-  /**
-   * Constructs a new UpdaterForm object.
-   *
-   * @param \Drupal\automatic_updates_extensions\ExtensionUpdater $extension_updater
-   *   The extension updater service.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
-   *   The extension event dispatcher service.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
-   * @param \Drupal\package_manager\FailureMarker $failure_marker
-   *   The failure marker service.
-   */
-  public function __construct(ExtensionUpdater $extension_updater, EventDispatcherInterface $event_dispatcher, RendererInterface $renderer, StateInterface $state, FailureMarker $failure_marker) {
-    $this->extensionUpdater = $extension_updater;
-    $this->eventDispatcher = $event_dispatcher;
-    $this->renderer = $renderer;
-    $this->state = $state;
-    $this->failureMarker = $failure_marker;
-  }
+  public function __construct(
+    private readonly ExtensionUpdateStage $stage,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly RendererInterface $renderer,
+    private readonly StateInterface $state,
+    private readonly FailureMarker $failureMarker,
+    private readonly ComposerInspector $composerInspector,
+    private readonly PathLocator $pathLocator,
+  ) {}
 
   /**
    * {@inheritdoc}
@@ -114,7 +72,7 @@ final class UpdaterForm extends UpdateFormBase {
     try {
       $this->failureMarker->assertNotExists();
     }
-    catch (ApplyFailedException $e) {
+    catch (StageFailureMarkerException $e) {
       $this->messenger()->addError($e->getMessage());
       return $form;
     }
@@ -135,10 +93,16 @@ final class UpdaterForm extends UpdateFormBase {
         default:
           $status_message = '';
       }
+      $project_release = ProjectRelease::createFromArray($update_project['releases'][$update_project['recommended']]);
       $options[$project_name] = [
         $update_project['title'] . $status_message,
         $update_project['existing_version'],
-        $update_project['recommended'],
+        $this->t(
+          '@version (<a href=":url">Release notes</a>)',
+          [
+            '@version' => $project_release->getVersion(),
+            ':url' => $project_release->getReleaseUrl(),
+          ]),
       ];
       $recommended_versions[$project_name] = $update_project['recommended'];
     }
@@ -157,14 +121,14 @@ final class UpdaterForm extends UpdateFormBase {
       '#empty' => $this->t('There are no available updates.'),
       '#attributes' => ['class' => ['update-recommended']],
       '#required' => TRUE,
-      '#required_error' => t('Please select one or more projects.'),
+      '#required_error' => t('Select one or more projects.'),
     ];
 
     if ($form_state->getUserInput()) {
       $results = [];
     }
     else {
-      $results = $this->runStatusCheck($this->extensionUpdater, $this->eventDispatcher, TRUE);
+      $results = $this->runStatusCheck($this->stage, $this->eventDispatcher);
     }
     $this->displayResults($results, $this->renderer);
     $security_level = ValidationResult::getOverallSeverity($results);
@@ -189,9 +153,9 @@ final class UpdaterForm extends UpdateFormBase {
    * @return mixed[][]
    *   The form's actions elements.
    */
-  protected function actions(FormStateInterface $form_state): array {
+  private function actions(FormStateInterface $form_state): array {
     $actions = ['#type' => 'actions'];
-    if (!$this->extensionUpdater->isAvailable()) {
+    if (!$this->stage->isAvailable()) {
       // If the form has been submitted do not display this error message
       // because ::deleteExistingUpdate() may run on submit. The message will
       // still be displayed on form build if needed.
@@ -217,7 +181,7 @@ final class UpdaterForm extends UpdateFormBase {
    * Submit function to delete an existing in-progress update.
    */
   public function deleteExistingUpdate(): void {
-    $this->extensionUpdater->destroy(TRUE);
+    $this->stage->destroy(TRUE);
     $this->messenger()->addMessage($this->t("Staged update deleted"));
   }
 
@@ -261,12 +225,12 @@ final class UpdaterForm extends UpdateFormBase {
 
     $all_projects_data = update_calculate_project_data($available_updates);
     $outdated_modules = [];
-    $installed_packages = array_keys($this->extensionUpdater->getActiveComposer()->getInstalledPackages());
+    $installed_packages = $this->composerInspector->getInstalledPackagesList($this->pathLocator->getProjectRoot());
     $non_supported_update_statuses = [];
     foreach ($all_projects_data as $project_name => $project_data) {
       if (in_array($project_data['project_type'], $supported_project_types, TRUE)) {
         if ($project_data['status'] !== UpdateManagerInterface::CURRENT) {
-          if (!in_array("drupal/$project_name", $installed_packages, TRUE)) {
+          if ($installed_packages->getPackageByDrupalProjectName($project_name) === NULL) {
             $non_supported_update_statuses[] = $project_data['status'];
             continue;
           }

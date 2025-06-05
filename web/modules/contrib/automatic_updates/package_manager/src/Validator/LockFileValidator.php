@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\Validator;
 
 use Drupal\Core\State\StateInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
-use Drupal\Core\StringTranslation\TranslationInterface;
-use Drupal\package_manager\Event\PostDestroyEvent;
+use Drupal\package_manager\Event\PostApplyEvent;
 use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
 use Drupal\package_manager\Event\PreOperationStageEvent;
@@ -33,116 +32,123 @@ final class LockFileValidator implements EventSubscriberInterface {
    *
    * @var string
    */
-  protected const STATE_KEY = 'package_manager.lock_hash';
+  private const STATE_KEY = 'package_manager.lock_hash';
+
+  public function __construct(
+    private readonly StateInterface $state,
+    private readonly PathLocator $pathLocator,
+  ) {}
 
   /**
-   * The state service.
+   * Returns the SHA-256 hash of a file.
    *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
-
-  /**
-   * The path locator service.
+   * This method is a thin wrapper around hash_file() to facilitate testing. On
+   * failure, hash_file() emits a warning but doesn't throw an exception. In
+   * tests, however, PHPUnit converts warnings to exceptions, so we need to
+   * catch those and convert them to the value hash_file() will actually return
+   * on error, which is FALSE. We could also just call `hash_file` directly and
+   * use @ to suppress warnings, but those would be unclear and likely to be
+   * accidentally removed later.
    *
-   * @var \Drupal\package_manager\PathLocator
-   */
-  protected $pathLocator;
-
-  /**
-   * Constructs a LockFileValidator object.
-   *
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
-   * @param \Drupal\package_manager\PathLocator $path_locator
-   *   The path locator service.
-   * @param \Drupal\Core\StringTranslation\TranslationInterface $translation
-   *   The string translation service.
-   */
-  public function __construct(StateInterface $state, PathLocator $path_locator, TranslationInterface $translation) {
-    $this->state = $state;
-    $this->pathLocator = $path_locator;
-    $this->setStringTranslation($translation);
-  }
-
-  /**
-   * Returns the current hash of the given directory's lock file.
-   *
-   * @param string $directory
-   *   Path of a directory containing a composer.lock file.
+   * @param string $path
+   *   Path of the file to hash.
    *
    * @return string|false
-   *   The hash of the given directory's lock file, or FALSE if the lock file
-   *   does not exist.
+   *   The hash of the given file, or FALSE if the file doesn't exist or cannot
+   *   be hashed.
    */
-  protected function getLockFileHash(string $directory) {
-    $file = $directory . DIRECTORY_SEPARATOR . 'composer.lock';
-    // We want to directly hash the lock file itself, rather than look at its
-    // content-hash value, which is actually a hash of the relevant parts of
-    // composer.json. We're trying to verify that the actual installed packages
-    // have not changed; we don't care about the constraints in composer.json.
+  private function getHash(string $path): string|false {
     try {
-      return hash_file('sha256', $file);
+      return @hash_file('xxh64', $path);
     }
-    catch (\Throwable $exception) {
+    catch (\Throwable) {
       return FALSE;
     }
   }
 
   /**
-   * Stores the current lock file hash.
+   * Stores the SHA-256 hash of the active lock file.
+   *
+   * We store the hash of the lock file itself, rather than its content-hash
+   * value, which is actually a hash of certain parts of composer.json. Our aim
+   * is to verify that the actual installed packages have not changed
+   * unexpectedly; we don't care about the contents of composer.json.
+   *
+   * @param \Drupal\package_manager\Event\PreCreateEvent $event
+   *   The event being handled.
    */
   public function storeHash(PreCreateEvent $event): void {
-    $hash = $this->getLockFileHash($this->pathLocator->getProjectRoot());
+    $active_lock_file_path = $this->pathLocator->getProjectRoot() . DIRECTORY_SEPARATOR . 'composer.lock';
+    $hash = $this->getHash($active_lock_file_path);
     if ($hash) {
       $this->state->set(static::STATE_KEY, $hash);
     }
     else {
       $event->addError([
-        $this->t('Could not hash the active lock file.'),
+        $this->t('The active lock file (@file) does not exist.', [
+          '@file' => $active_lock_file_path,
+        ]),
       ]);
     }
   }
 
   /**
-   * {@inheritdoc}
+   * Checks that the active lock file is unchanged during stage operations.
+   *
+   * @param \Drupal\package_manager\Event\PreOperationStageEvent $event
+   *   The event being handled.
    */
-  public function validateStagePreOperation(PreOperationStageEvent $event): void {
+  public function validate(PreOperationStageEvent $event): void {
+    $stage = $event->stage;
+
     // Early return if the stage is not already created.
-    if ($event instanceof StatusCheckEvent && $event->getStage()->isAvailable()) {
+    if ($event instanceof StatusCheckEvent && $stage->isAvailable()) {
       return;
     }
 
+    $messages = [];
     // Ensure we can get a current hash of the lock file.
-    $active_hash = $this->getLockFileHash($this->pathLocator->getProjectRoot());
-    if (empty($active_hash)) {
-      $error = $this->t('Could not hash the active lock file.');
+    $active_lock_file_path = $this->pathLocator->getProjectRoot() . DIRECTORY_SEPARATOR . 'composer.lock';
+    $active_lock_file_hash = $this->getHash($active_lock_file_path);
+    if (empty($active_lock_file_hash)) {
+      $messages[] = $this->t('The active lock file (@file) does not exist.', [
+        '@file' => $active_lock_file_path,
+      ]);
     }
 
     // Ensure we also have a stored hash of the lock file.
-    $stored_hash = $this->state->get(static::STATE_KEY);
-    if (empty($stored_hash)) {
-      $error = $this->t('Could not retrieve stored hash of the active lock file.');
+    $active_lock_file_stored_hash = $this->state->get(static::STATE_KEY);
+    if (empty($active_lock_file_stored_hash)) {
+      throw new \LogicException('Stored hash key deleted.');
     }
 
     // If we have both hashes, ensure they match.
-    if ($active_hash && $stored_hash && !hash_equals($stored_hash, $active_hash)) {
-      $error = $this->t('Unexpected changes were detected in composer.lock, which indicates that other Composer operations were performed since this Package Manager operation started. This can put the code base into an unreliable state and therefore is not allowed.');
+    if ($active_lock_file_hash && $active_lock_file_stored_hash && !hash_equals($active_lock_file_stored_hash, $active_lock_file_hash)) {
+      $messages[] = $this->t('Unexpected changes were detected in the active lock file (@file), which indicates that other Composer operations were performed since this Package Manager operation started. This can put the code base into an unreliable state and therefore is not allowed.', [
+        '@file' => $active_lock_file_path,
+      ]);
     }
 
     // Don't allow staged changes to be applied if the staged lock file has no
     // apparent changes.
-    if (empty($error) && $event instanceof PreApplyEvent) {
-      $stage_hash = $this->getLockFileHash($event->getStage()->getStageDirectory());
-      if ($stage_hash && hash_equals($active_hash, $stage_hash)) {
-        $error = $this->t('There are no pending Composer operations.');
+    if (empty($messages) && $event instanceof PreApplyEvent) {
+      $staged_lock_file_path = $stage->getStageDirectory() . DIRECTORY_SEPARATOR . 'composer.lock';
+      $staged_lock_file_hash = $this->getHash($staged_lock_file_path);
+      if ($staged_lock_file_hash && hash_equals($active_lock_file_hash, $staged_lock_file_hash)) {
+        $messages[] = $this->t('There appear to be no pending Composer operations because the active lock file (@active_file) and the staged lock file (@staged_file) are identical.', [
+          '@active_file' => $active_lock_file_path,
+          '@staged_file' => $staged_lock_file_path,
+        ]);
       }
     }
 
-    // @todo Let the validation result carry all the relevant messages in
-    //   https://www.drupal.org/i/3247479.
-    if (isset($error)) {
-      $event->addError([$error]);
+    if (!empty($messages)) {
+      $summary = $this->formatPlural(
+        count($messages),
+        'Problem detected in lock file during stage operations.',
+        'Problems detected in lock file during stage operations.',
+      );
+      $event->addError($messages, $summary);
     }
   }
 
@@ -159,10 +165,10 @@ final class LockFileValidator implements EventSubscriberInterface {
   public static function getSubscribedEvents(): array {
     return [
       PreCreateEvent::class => 'storeHash',
-      PreRequireEvent::class => 'validateStagePreOperation',
-      PreApplyEvent::class => 'validateStagePreOperation',
-      StatusCheckEvent::class => 'validateStagePreOperation',
-      PostDestroyEvent::class => 'deleteHash',
+      PreRequireEvent::class => 'validate',
+      PreApplyEvent::class => 'validate',
+      StatusCheckEvent::class => 'validate',
+      PostApplyEvent::class => 'deleteHash',
     ];
   }
 

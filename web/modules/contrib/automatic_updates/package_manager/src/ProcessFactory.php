@@ -1,14 +1,14 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\File\FileSystemInterface;
-use PhpTuf\ComposerStager\Infrastructure\Factory\Process\ProcessFactoryInterface;
-use PhpTuf\ComposerStager\Infrastructure\Factory\Process\ProcessFactory as StagerProcessFactory;
-use Symfony\Component\Process\Process;
+use PhpTuf\ComposerStager\API\Path\Value\PathInterface;
+use PhpTuf\ComposerStager\API\Process\Factory\ProcessFactoryInterface;
+use PhpTuf\ComposerStager\API\Process\Service\ProcessInterface;
 
 // cspell:ignore BINDIR
 
@@ -22,40 +22,11 @@ use Symfony\Component\Process\Process;
  */
 final class ProcessFactory implements ProcessFactoryInterface {
 
-  /**
-   * The decorated process factory.
-   *
-   * @var \PhpTuf\ComposerStager\Infrastructure\Factory\Process\ProcessFactoryInterface
-   */
-  private $decorated;
-
-  /**
-   * The file system service.
-   *
-   * @var \Drupal\Core\File\FileSystemInterface
-   */
-  private $fileSystem;
-
-  /**
-   * The config factory service.
-   *
-   * @var \Drupal\Core\Config\ConfigFactoryInterface
-   */
-  private $configFactory;
-
-  /**
-   * Constructs a ProcessFactory object.
-   *
-   * @param \Drupal\Core\File\FileSystemInterface $file_system
-   *   The file system service.
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
-   *   The config factory service.
-   */
-  public function __construct(FileSystemInterface $file_system, ConfigFactoryInterface $config_factory) {
-    $this->decorated = new StagerProcessFactory();
-    $this->fileSystem = $file_system;
-    $this->configFactory = $config_factory;
-  }
+  public function __construct(
+    private readonly FileSystemInterface $fileSystem,
+    private readonly ConfigFactoryInterface $configFactory,
+    private readonly ProcessFactoryInterface $decorated,
+  ) {}
 
   /**
    * Returns the value of an environment variable.
@@ -76,17 +47,18 @@ final class ProcessFactory implements ProcessFactoryInterface {
   /**
    * {@inheritdoc}
    */
-  public function create(array $command): Process {
-    $process = $this->decorated->create($command);
+  public function create(array $command, ?PathInterface $workingDir = NULL, array $env = []): ProcessInterface {
+    $process = $this->decorated->create($command, $workingDir, $env);
 
     $env = $process->getEnv();
-    if ($this->isComposerCommand($command)) {
+    if ($command && $this->isComposerCommand($command)) {
       $env['COMPOSER_HOME'] = $this->getComposerHomePath();
     }
     // Ensure that the current PHP installation is the first place that will be
     // searched when looking for the PHP interpreter.
     $env['PATH'] = static::getPhpDirectory() . ':' . $this->getEnv('PATH');
-    return $process->setEnv($env);
+    $process->setEnv($env);
+    return $process;
   }
 
   /**
@@ -100,7 +72,7 @@ final class ProcessFactory implements ProcessFactoryInterface {
    * @see php_sapi_name()
    * @see https://www.php.net/manual/en/reserved.constants.php
    */
-  protected static function getPhpDirectory(): string {
+  private static function getPhpDirectory(): string {
     if (PHP_SAPI === 'cli' || PHP_SAPI === 'cli-server') {
       return dirname(PHP_BINARY);
     }

@@ -1,21 +1,14 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Kernel;
 
-use Drupal\Core\DependencyInjection\ContainerBuilder;
-use Drupal\Core\Url;
-use Drupal\package_manager\Event\CollectIgnoredPathsEvent;
-use Drupal\package_manager\Event\PreApplyEvent;
 use Drupal\package_manager\Event\PreCreateEvent;
-use Drupal\package_manager\Event\StatusCheckEvent;
+use Drupal\package_manager\Exception\StageEventException;
+use Drupal\package_manager\PathLocator;
 use Drupal\package_manager\ValidationResult;
-use PhpTuf\ComposerStager\Domain\Exception\PreconditionException;
-use PhpTuf\ComposerStager\Domain\Service\Precondition\CodebaseContainsNoSymlinksInterface;
-use PhpTuf\ComposerStager\Domain\Value\Path\PathInterface;
-use PhpTuf\ComposerStager\Domain\Value\PathList\PathListInterface;
-use PHPUnit\Framework\Assert;
+use PhpTuf\ComposerStager\API\Environment\Service\EnvironmentInterface;
 use Prophecy\Argument;
 
 /**
@@ -26,134 +19,185 @@ use Prophecy\Argument;
 class SymlinkValidatorTest extends PackageManagerKernelTestBase {
 
   /**
-   * The mocked precondition that checks for symlinks.
-   *
-   * @var \PhpTuf\ComposerStager\Domain\Service\Precondition\CodebaseContainsNoSymlinksInterface|\Prophecy\Prophecy\ObjectProphecy
+   * Tests that relative symlinks within the same package are supported.
    */
-  private $precondition;
+  public function testSymlinksWithinSamePackage(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
 
-  /**
-   * {@inheritdoc}
-   */
-  protected function setUp(): void {
-    $this->precondition = $this->prophesize(CodebaseContainsNoSymlinksInterface::class);
-    parent::setUp();
+    $drush_dir = $project_root . '/vendor/drush/drush';
+    mkdir($drush_dir . '/docs', 0777, TRUE);
+    touch($drush_dir . '/drush_logo-black.png');
+    // Relative symlinks must be made from their actual directory to be
+    // correctly evaluated.
+    chdir($drush_dir . '/docs');
+    symlink('../drush_logo-black.png', 'drush_logo-black.png');
+
+    // Switch back to the Drupal root to ensure that the check isn't affected
+    // by which directory we happen to be in.
+    chdir($this->getDrupalRoot());
+    $this->assertStatusCheckResults([]);
   }
 
   /**
-   * {@inheritdoc}
+   * Tests that hard links are not supported.
    */
-  public function register(ContainerBuilder $container) {
-    parent::register($container);
+  public function testHardLinks(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
 
-    $container->getDefinition('package_manager.validator.symlink')
-      ->setArgument('$precondition', $this->precondition->reveal());
+    link($project_root . '/composer.json', $project_root . '/composer.link');
+    $result = ValidationResult::createError([
+      t('The %which directory at %dir contains hard links, which is not supported. The first one is %file.', [
+        '%which' => 'active',
+        '%dir' => $project_root,
+        '%file' => $project_root . '/composer.json',
+      ]),
+    ]);
+    $this->assertStatusCheckResults([$result]);
   }
 
   /**
-   * Data provider for ::testSymlink().
-   *
-   * @return array[]
-   *   The test cases.
+   * Tests that symlinks with absolute paths are not supported.
    */
-  public function providerSymlink(): array {
-    $test_cases = [];
-    foreach ([PreApplyEvent::class, PreCreateEvent::class, StatusCheckEvent::class] as $event) {
-      $test_cases["$event event with no symlinks"] = [
-        FALSE,
-        [],
-        $event,
-      ];
-      $test_cases["$event event with symlinks"] = [
-        TRUE,
-        [
-          ValidationResult::createError([t('Symlinks were found.')]),
-        ],
-        $event,
-      ];
-    }
-    return $test_cases;
+  public function testAbsoluteSymlinks(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
+
+    symlink($project_root . '/composer.json', $project_root . '/composer.link');
+    $result = ValidationResult::createError([
+      t('The %which directory at %dir contains absolute links, which is not supported. The first one is %file.', [
+        '%which' => 'active',
+        '%dir' => $project_root,
+        '%file' => $project_root . '/composer.link',
+      ]),
+    ]);
+    $this->assertStatusCheckResults([$result]);
   }
 
   /**
-   * Tests that the validator invokes Composer Stager's symlink precondition.
-   *
-   * @param bool $symlinks_exist
-   *   Whether or not the precondition will detect symlinks.
-   * @param \Drupal\package_manager\ValidationResult[] $expected_results
-   *   The expected validation results.
-   * @param string $event
-   *   The event to test.
-   *
-   * @dataProvider providerSymlink
+   * Tests that relative symlinks cannot point outside the project root.
    */
-  public function testSymlink(bool $symlinks_exist, array $expected_results, string $event): void {
-    $add_ignored_path = function (CollectIgnoredPathsEvent $event): void {
-      $event->add(['ignore/me']);
-    };
-    $this->addEventTestListener($add_ignored_path, CollectIgnoredPathsEvent::class);
+  public function testSymlinkPointingOutsideProjectRoot(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
 
-    // Expected argument types for active directory, stage directory and ignored
-    // paths passed while checking if precondition is fulfilled.
-    // @see \PhpTuf\ComposerStager\Domain\Service\Precondition\PreconditionInterface::assertIsFulfilled()
-    $arguments = [
-      Argument::type(PathInterface::class),
-      Argument::type(PathInterface::class),
-      Argument::type(PathListInterface::class),
-    ];
-    $listener = function () use ($arguments, $symlinks_exist): void {
-      // Ensure that the Composer Stager's symlink precondition is invoked.
-      $this->precondition->assertIsFulfilled(...$arguments)
-        ->will(function (array $arguments) use ($symlinks_exist): void {
-          // Ensure that 'ignore/me' is present in ignored paths.
-          Assert::assertContains('ignore/me', $arguments[2]->getAll());
+    $parent_dir = dirname($project_root);
+    touch($parent_dir . '/hello.txt');
+    // Relative symlinks must be made from their actual directory to be
+    // correctly evaluated.
+    chdir($project_root);
+    symlink('../hello.txt', 'fail.txt');
+    $result = ValidationResult::createError([
+      t('The %which directory at %dir contains links that point outside the codebase, which is not supported. The first one is %file.', [
+        '%which' => 'active',
+        '%dir' => $project_root,
+        '%file' => $project_root . '/fail.txt',
+      ]),
+    ]);
+    $this->assertStatusCheckResults([$result]);
+    $this->assertResults([$result], PreCreateEvent::class);
+  }
 
-          // Whether to simulate or not that a symlink is found in the active
-          // or staging directory (but outside the ignored paths).
-          if ($symlinks_exist) {
-            throw new PreconditionException($this->reveal(), 'Symlinks were found.');
-          }
-        })
-        ->shouldBeCalled();
-    };
-    $this->addEventTestListener($listener, $event);
-    if ($event === StatusCheckEvent::class) {
-      $this->assertStatusCheckResults($expected_results);
+  /**
+   * Tests that relative symlinks cannot point outside the stage directory.
+   */
+  public function testSymlinkPointingOutsideStageDirectory(): void {
+    // The same check should apply to symlinks in the stage directory that
+    // point outside of it.
+    $stage = $this->createStage();
+    $stage->create();
+    $stage->require(['ext-json:*']);
+
+    $stage_dir = $stage->getStageDirectory();
+    $parent_dir = dirname($stage_dir);
+    touch($parent_dir . '/hello.txt');
+    // Relative symlinks must be made from their actual directory to be
+    // correctly evaluated.
+    chdir($stage_dir);
+    symlink('../hello.txt', 'fail.txt');
+
+    $result = ValidationResult::createError([
+      t('The %which directory at %dir contains links that point outside the codebase, which is not supported. The first one is %file.', [
+        '%which' => 'staging',
+        '%dir' => $stage_dir,
+        '%file' => $stage_dir . '/fail.txt',
+      ]),
+    ]);
+    try {
+      $stage->apply();
+      $this->fail('Expected an exception, but none was thrown.');
     }
-    else {
-      $this->assertResults($expected_results, $event);
+    catch (StageEventException $e) {
+      $this->assertExpectedResultsFromException([$result], $e);
     }
   }
 
   /**
-   * Tests the Composer Stager's symlink precondition with richer help.
-   *
-   * @param bool $symlinks_exist
-   *   Whether or not the precondition will detect symlinks.
-   * @param array $expected_results
-   *   The expected validation results.
-   * @param string $event
-   *   The event to test.
-   *
-   * @dataProvider providerSymlink
+   * Tests what happens when there is a symlink to a directory.
    */
-  public function testHelpLink(bool $symlinks_exist, array $expected_results, string $event): void {
-    $this->enableModules(['help']);
+  public function testSymlinkToDirectory(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
 
-    $url = Url::fromRoute('help.page', ['name' => 'package_manager'])
-      ->setOption('fragment', 'package-manager-faq-symlinks-found')
-      ->toString();
+    mkdir($project_root . '/modules/custom');
+    // Relative symlinks must be made from their actual directory to be
+    // correctly evaluated.
+    chdir($project_root . '/modules/custom');
+    symlink('../example', 'example_module');
 
-    // Reformat the provided results so that they all have the link to the
-    // online documentation appended to them.
-    $map = function (string $message) use ($url): string {
-      return $message . ' See <a href="' . $url . '">the help page</a> for information on how to resolve the problem.';
-    };
-    foreach ($expected_results as $index => $result) {
-      $messages = array_map($map, $result->getMessages());
-      $expected_results[$index] = ValidationResult::createError($messages);
-    }
-    $this->testSymlink($symlinks_exist, $expected_results, $event);
+    // Switch back to the Drupal root to ensure that the check isn't affected
+    // by which directory we happen to be in.
+    chdir($this->getDrupalRoot());
+    $this->assertStatusCheckResults([]);
+  }
+
+  /**
+   * Tests that symlinks are not supported on Windows, even if they're safe.
+   */
+  public function testSymlinksNotAllowedOnWindows(): void {
+    $environment = $this->prophesize(EnvironmentInterface::class);
+    $environment->isWindows()->willReturn(TRUE);
+    $environment->setTimeLimit(Argument::type('int'))->willReturn(TRUE);
+    $this->container->set(EnvironmentInterface::class, $environment->reveal());
+
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
+    // Relative symlinks must be made from their actual directory to be
+    // correctly evaluated.
+    chdir($project_root);
+    symlink('composer.json', 'composer.link');
+
+    $result = ValidationResult::createError([
+      t('The %which directory at %dir contains links, which is not supported on Windows. The first one is %file.', [
+        '%which' => 'active',
+        '%dir' => $project_root,
+        '%file' => $project_root . '/composer.link',
+      ]),
+    ]);
+    $this->assertStatusCheckResults([$result]);
+  }
+
+  /**
+   * Tests that unsupported links are excluded if they're under excluded paths.
+   *
+   * @depends testAbsoluteSymlinks
+   *
+   * @covers \Drupal\package_manager\PathExcluder\GitExcluder
+   * @covers \Drupal\package_manager\PathExcluder\NodeModulesExcluder
+   */
+  public function testUnsupportedLinkUnderExcludedPath(): void {
+    $project_root = $this->container->get(PathLocator::class)
+      ->getProjectRoot();
+
+    // Create absolute symlinks (which are not supported by Composer Stager) in
+    // both `node_modules`, which is a regular directory, and `.git`, which is a
+    // hidden directory.
+    mkdir($project_root . '/node_modules');
+    symlink($project_root . '/composer.json', $project_root . '/node_modules/composer.link');
+    symlink($project_root . '/composer.json', $project_root . '/.git/composer.link');
+
+    $this->assertStatusCheckResults([]);
   }
 
 }

@@ -1,16 +1,21 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Validation;
 
-use Drupal\automatic_updates\CronUpdater;
+use Drupal\automatic_updates\CronUpdateRunner;
+use Drupal\automatic_updates\ConsoleUpdateStage;
+use Drupal\automatic_updates\StatusCheckMailer;
+use Drupal\Core\Config\ConfigCrudEvent;
+use Drupal\Core\Config\ConfigEvents;
+use Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface;
 use Drupal\package_manager\StatusCheckTrait;
-use Drupal\automatic_updates\Updater;
+use Drupal\automatic_updates\UpdateStage;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface;
 use Drupal\package_manager\Event\PostApplyEvent;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -25,66 +30,18 @@ final class StatusChecker implements EventSubscriberInterface {
    *
    * @var \Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface
    */
-  protected $keyValueExpirable;
+  private readonly KeyValueStoreExpirableInterface $keyValueExpirable;
 
-  /**
-   * The time service.
-   *
-   * @var \Drupal\Component\Datetime\TimeInterface
-   */
-  protected $time;
-
-  /**
-   * The event dispatcher service.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  protected $eventDispatcher;
-
-  /**
-   * The number of hours to store results.
-   *
-   * @var int
-   */
-  protected $resultsTimeToLive;
-
-  /**
-   * The updater service.
-   *
-   * @var \Drupal\automatic_updates\Updater
-   */
-  protected $updater;
-
-  /**
-   * The cron updater service.
-   *
-   * @var \Drupal\automatic_updates\CronUpdater
-   */
-  protected $cronUpdater;
-
-  /**
-   * Constructs a StatusChecker.
-   *
-   * @param \Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface $key_value_expirable_factory
-   *   The key/value expirable factory.
-   * @param \Drupal\Component\Datetime\TimeInterface $time
-   *   The time service.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $dispatcher
-   *   The event dispatcher service.
-   * @param \Drupal\automatic_updates\Updater $updater
-   *   The updater service.
-   * @param \Drupal\automatic_updates\CronUpdater $cron_updater
-   *   The cron updater service.
-   * @param int $results_time_to_live
-   *   The number of hours to store results.
-   */
-  public function __construct(KeyValueExpirableFactoryInterface $key_value_expirable_factory, TimeInterface $time, EventDispatcherInterface $dispatcher, Updater $updater, CronUpdater $cron_updater, int $results_time_to_live) {
+  public function __construct(
+    KeyValueExpirableFactoryInterface $key_value_expirable_factory,
+    private readonly TimeInterface $time,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly UpdateStage $updateStage,
+    private readonly ConsoleUpdateStage $consoleUpdateStage,
+    private readonly CronUpdateRunner $cronUpdateRunner,
+    private readonly int $resultsTimeToLive,
+  ) {
     $this->keyValueExpirable = $key_value_expirable_factory->get('automatic_updates');
-    $this->time = $time;
-    $this->eventDispatcher = $dispatcher;
-    $this->updater = $updater;
-    $this->cronUpdater = $cron_updater;
-    $this->resultsTimeToLive = $results_time_to_live;
   }
 
   /**
@@ -93,16 +50,16 @@ final class StatusChecker implements EventSubscriberInterface {
    * @return $this
    */
   public function run(): self {
-    // If updates will run during cron, use the cron updater service provided by
-    // this module. This will allow validators to run specific validation for
-    // conditions that only affect cron updates.
-    if ($this->cronUpdater->getMode() === CronUpdater::DISABLED) {
-      $stage = $this->updater;
+    // If updates will run during cron, use the console update stage service
+    // provided by this module. This will allow validators to run specific
+    // validation for conditions that only affect cron updates.
+    if ($this->cronUpdateRunner->getMode() === CronUpdateRunner::DISABLED) {
+      $stage = $this->updateStage;
     }
     else {
-      $stage = $this->cronUpdater;
+      $stage = $this->consoleUpdateStage;
     }
-    $results = $this->runStatusCheck($stage, $this->eventDispatcher, TRUE);
+    $results = $this->runStatusCheck($stage, $this->eventDispatcher);
 
     $this->keyValueExpirable->setWithExpire(
       'status_check_last_run',
@@ -134,7 +91,7 @@ final class StatusChecker implements EventSubscriberInterface {
    *   (optional) The severity for the results to return. Should be one of the
    *   SystemManager::REQUIREMENT_* constants.
    *
-   * @return \Drupal\package_manager\ValidationResult[]|
+   * @return \Drupal\package_manager\ValidationResult[]|null
    *   The validation result objects or NULL if no results are
    *   available or if the stored results are no longer valid.
    */
@@ -143,7 +100,7 @@ final class StatusChecker implements EventSubscriberInterface {
     if ($results !== NULL) {
       if ($severity !== NULL) {
         $results = array_filter($results, function ($result) use ($severity) {
-          return $result->getSeverity() === $severity;
+          return $result->severity === $severity;
         });
       }
       return $results;
@@ -170,11 +127,42 @@ final class StatusChecker implements EventSubscriberInterface {
   }
 
   /**
+   * Reacts when config is saved.
+   *
+   * @param \Drupal\Core\Config\ConfigCrudEvent $event
+   *   The event object.
+   */
+  public function onConfigSave(ConfigCrudEvent $event): void {
+    $config = $event->getConfig();
+
+    // If the path of the Composer executable has changed, the status check
+    // results are likely to change as well.
+    if ($config->getName() === 'package_manager.settings' && $event->isChanged('executables.composer')) {
+      $this->clearStoredResults();
+    }
+    elseif ($config->getName() === 'automatic_updates.settings') {
+      // If anything about how we run unattended updates has changed, clear the
+      // stored results, since they can be affected by these settings.
+      if ($event->isChanged('unattended')) {
+        $this->clearStoredResults();
+      }
+      // We only send status check failure notifications if unattended updates
+      // are enabled. If notifications were previously disabled but have been
+      // re-enabled, or their sensitivity level has changed, clear the stored
+      // results so that we'll send accurate notifications next time cron runs.
+      elseif ($event->isChanged('status_check_mail') && $config->get('status_check_mail') !== StatusCheckMailer::DISABLED) {
+        $this->clearStoredResults();
+      }
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
-  public static function getSubscribedEvents() {
+  public static function getSubscribedEvents(): array {
     return [
       PostApplyEvent::class => 'clearStoredResults',
+      ConfigEvents::SAVE => 'onConfigSave',
     ];
   }
 

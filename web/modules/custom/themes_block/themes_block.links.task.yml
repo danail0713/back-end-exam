@@ -1,0 +1,12 @@
+themes_block.themes:
+  title: Themes
+  route_name: themes_block.add_theme
+  base_route: system.admin_content
+themes_block.add_theme:
+  title: Add a theme
+  route_name: themes_block.add_theme
+  parent_id: themes_block.themes
+themes_block.delete_theme:
+  title: Delete themes
+  route_name: themes_block.delete_theme
+  parent_id: themes_block.themes

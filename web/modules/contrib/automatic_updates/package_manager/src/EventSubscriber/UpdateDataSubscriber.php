@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\package_manager\EventSubscriber;
 
@@ -18,21 +18,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  */
 final class UpdateDataSubscriber implements EventSubscriberInterface {
 
-  /**
-   * The update manager service.
-   *
-   * @var \Drupal\update\UpdateManagerInterface
-   */
-  protected $updateManager;
-
-  /**
-   * Constructs an UpdateRefreshSubscriber object.
-   *
-   * @param \Drupal\update\UpdateManagerInterface $update_manager
-   *   The update manager service.
-   */
-  public function __construct(UpdateManagerInterface $update_manager) {
-    $this->updateManager = $update_manager;
+  public function __construct(private readonly UpdateManagerInterface $updateManager) {
   }
 
   /**

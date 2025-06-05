@@ -1,12 +1,15 @@
 <?php
 
 declare(strict_types=1);
+
 namespace Drupal\themes_block\Form;
+
 use Drupal;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\Entity\Node;
 use MongoDB\Client;
+
 /**
  * Provides a Themes form.
  */
@@ -36,22 +39,20 @@ final class AddThemeForm extends FormBase {
       '#required' => TRUE,
       '#default_value' => '',
       '#allowed_formats' => ['basic_html'],
-      '#disable_help' => TRUE, // Try to hide help text
       '#after_build' => [[get_class($this), 'hideTextFormatHelpText'],],
     ];
 
 
     // Add Select List for Available Courses.
-    $course_options = $this->getAvailableCourses();
     $form['course_select'] = [
       '#type' => 'select',
       '#title' => $this->t('Select Course'),
-      '#options' => $course_options,
+      '#options' => $this->getAvailableCourses(),
       '#required' => TRUE,
     ];
     $form['submit'] = [
       '#type' => 'submit',
-      '#value' => $this->t('Save theme'),
+      '#value' => $this->t('Add theme'),
     ];
     return $form;
   }
@@ -107,12 +108,11 @@ final class AddThemeForm extends FormBase {
     $title = $form_state->getValue('title');
     $description = $form_state->getValue('description')['value'];
     $course_id = $form_state->getValue('course_select');
-
+    $selected_course = $form['course_select']['#options'][$course_id];
     // Connect to MongoDB.
     try {
       $client = new Client("mongodb://localhost:27017");
       $collection = $client->getDatabase('test')->getCollection('themes');
-
       // Prepare the document.
       $theme_data = [
         'title' => $title,
@@ -127,7 +127,10 @@ final class AddThemeForm extends FormBase {
 
       // Show success message.
       if ($insertResult->getInsertedCount() > 0) {
-        $this->messenger()->addMessage($this->t('The theme has been saved to MongoDB.'));
+        $this->messenger()->addMessage($this->t(
+          'The theme has been added to the course @course.',
+          ['@course' => $selected_course]
+        ));
       } else {
         $this->messenger()->addError($this->t('Failed to save the theme.'));
       }

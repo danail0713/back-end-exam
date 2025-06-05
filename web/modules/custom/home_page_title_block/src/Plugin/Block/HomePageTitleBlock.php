@@ -21,7 +21,7 @@ class HomePageTitleBlock extends BlockBase {
    */
   public function build() {
     $build['content'] = [
-      '#markup' => $this->t('<h1>Find the courses you are interested in the field of IT and marketing.</h1>'),
+      '#markup' => $this->t('<h1>Find the courses you are interested in the IT field.</h1>'),
     ];
     return $build;
   }

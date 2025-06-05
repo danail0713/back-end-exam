@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\Tests\package_manager\Unit;
 
@@ -29,7 +29,7 @@ class RequireEventTraitTest extends UnitTestCase {
    * @dataProvider providerGetPackages
    */
   public function testGetPackages(array $runtime_packages, array $dev_packages, array $expected_runtime_packages, array $expected_dev_packages): void {
-    $stage = $this->createMock('\Drupal\package_manager\Stage');
+    $stage = $this->createMock('\Drupal\package_manager\StageBase');
 
     $events = [
       '\Drupal\package_manager\Event\PostRequireEvent',
@@ -49,7 +49,7 @@ class RequireEventTraitTest extends UnitTestCase {
    * @return mixed[]
    *   The test cases.
    */
-  public function providerGetPackages(): array {
+  public static function providerGetPackages(): array {
     return [
       'Package with constraint' => [
         ['drupal/new_package:^8.1'],

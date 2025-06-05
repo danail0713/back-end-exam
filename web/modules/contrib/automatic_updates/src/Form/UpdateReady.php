@@ -1,19 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Drupal\automatic_updates\Form;
 
 use Drupal\automatic_updates\BatchProcessor;
-use Drupal\automatic_updates\Updater;
+use Drupal\automatic_updates\UpdateStage;
+use Drupal\package_manager\ComposerInspector;
+use Drupal\package_manager\Exception\StageFailureMarkerException;
 use Drupal\package_manager\ValidationResult;
 use Drupal\Core\Batch\BatchBuilder;
-use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\State\StateInterface;
-use Drupal\package_manager\Exception\ApplyFailedException;
 use Drupal\package_manager\Exception\StageException;
 use Drupal\package_manager\Exception\StageOwnershipException;
 use Drupal\system\SystemManager;
@@ -28,65 +28,13 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 final class UpdateReady extends UpdateFormBase {
 
-  /**
-   * The updater service.
-   *
-   * @var \Drupal\automatic_updates\Updater
-   */
-  protected $updater;
-
-  /**
-   * The state service.
-   *
-   * @var \Drupal\Core\State\StateInterface
-   */
-  protected $state;
-
-  /**
-   * The module list service.
-   *
-   * @var \Drupal\Core\Extension\ModuleExtensionList
-   */
-  protected $moduleList;
-
-  /**
-   * The renderer service.
-   *
-   * @var \Drupal\Core\Render\RendererInterface
-   */
-  protected $renderer;
-
-  /**
-   * The event dispatcher.
-   *
-   * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
-   */
-  protected $eventDispatcher;
-
-  /**
-   * Constructs a new UpdateReady object.
-   *
-   * @param \Drupal\automatic_updates\Updater $updater
-   *   The updater service.
-   * @param \Drupal\Core\Messenger\MessengerInterface $messenger
-   *   The messenger service.
-   * @param \Drupal\Core\State\StateInterface $state
-   *   The state service.
-   * @param \Drupal\Core\Extension\ModuleExtensionList $module_list
-   *   The module list service.
-   * @param \Drupal\Core\Render\RendererInterface $renderer
-   *   The renderer service.
-   * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
-   *   Event dispatcher service.
-   */
-  public function __construct(Updater $updater, MessengerInterface $messenger, StateInterface $state, ModuleExtensionList $module_list, RendererInterface $renderer, EventDispatcherInterface $event_dispatcher) {
-    $this->updater = $updater;
-    $this->setMessenger($messenger);
-    $this->state = $state;
-    $this->moduleList = $module_list;
-    $this->renderer = $renderer;
-    $this->eventDispatcher = $event_dispatcher;
-  }
+  public function __construct(
+    private readonly UpdateStage $stage,
+    private readonly StateInterface $state,
+    private readonly RendererInterface $renderer,
+    private readonly EventDispatcherInterface $eventDispatcher,
+    private readonly ComposerInspector $composerInspector,
+  ) {}
 
   /**
    * {@inheritdoc}
@@ -100,27 +48,26 @@ final class UpdateReady extends UpdateFormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('automatic_updates.updater'),
-      $container->get('messenger'),
+      $container->get(UpdateStage::class),
       $container->get('state'),
-      $container->get('extension.list.module'),
       $container->get('renderer'),
-      $container->get('event_dispatcher')
+      $container->get('event_dispatcher'),
+      $container->get(ComposerInspector::class),
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, FormStateInterface $form_state, string $stage_id = NULL) {
+  public function buildForm(array $form, FormStateInterface $form_state, ?string $stage_id = NULL) {
     try {
-      $this->updater->claim($stage_id);
+      $this->stage->claim($stage_id);
     }
     catch (StageOwnershipException $e) {
       $this->messenger()->addError($e->getMessage());
       return $form;
     }
-    catch (ApplyFailedException $e) {
+    catch (StageFailureMarkerException $e) {
       $this->messenger()->addError($e->getMessage());
       return $form;
     }
@@ -128,10 +75,11 @@ final class UpdateReady extends UpdateFormBase {
     $messages = [];
 
     try {
-      $staged_core_packages = $this->updater->getStageComposer()
-        ->getCorePackages();
+      $staged_core_packages = $this->composerInspector->getInstalledPackagesList($this->stage->getStageDirectory())
+        ->getCorePackages()
+        ->getArrayCopy();
     }
-    catch (\Throwable $exception) {
+    catch (\Throwable) {
       $messages[MessengerInterface::TYPE_ERROR][] = $this->t('There was an error loading the pending update. Press the <em>Cancel update</em> button to start over.');
     }
 
@@ -166,7 +114,7 @@ final class UpdateReady extends UpdateFormBase {
       '#type' => 'html_tag',
       '#tag' => 'p',
       '#value' => $this->t('Drupal core will be updated to %version', [
-        '%version' => reset($staged_core_packages)->getPrettyVersion(),
+        '%version' => reset($staged_core_packages)->version,
       ]),
     ];
     $form['backup'] = [
@@ -184,7 +132,7 @@ final class UpdateReady extends UpdateFormBase {
 
     // Don't run the status checks once the form has been submitted.
     if (!$form_state->getUserInput()) {
-      $results = $this->runStatusCheck($this->updater, $this->eventDispatcher);
+      $results = $this->runStatusCheck($this->stage, $this->eventDispatcher);
       // This will have no effect if $results is empty.
       $this->displayResults($results, $this->renderer);
       // If any errors occurred, return the form early so the user cannot
@@ -197,6 +145,7 @@ final class UpdateReady extends UpdateFormBase {
       '#type' => 'submit',
       '#value' => $this->t('Continue'),
     ];
+    $form['actions']['submit']['#button_type'] = 'primary';
     return $form;
   }
 
@@ -231,7 +180,7 @@ final class UpdateReady extends UpdateFormBase {
    */
   public function cancel(array &$form, FormStateInterface $form_state): void {
     try {
-      $this->updater->destroy();
+      $this->stage->destroy();
       $this->messenger()->addStatus($this->t('The update was successfully cancelled.'));
       $form_state->setRedirect('update.report_update');
     }

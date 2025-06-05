@@ -114,22 +114,16 @@ class LegacyMailerHelper implements LegacyMailerHelperInterface {
     $attachments = $message['params']['attachments'] ?? [];
     foreach ($attachments as $attachment) {
       if (!empty($attachment['filepath'])) {
-        $email->attachFromPath($attachment['filepath'], $attachment['filename'] ?? NULL, $attachment['filemime'] ?? NULL);
+        $email->attach(Attachment::fromPath($attachment['filepath'], $attachment['filename'] ?? NULL, $attachment['filemime'] ?? NULL));
       }
       elseif (!empty($attachment['filecontent'])) {
-        $email->attachNoPath($attachment["filecontent"], $attachment['filename'] ?? NULL, $attachment['filemime'] ?? NULL);
+        $email->attach(Attachment::fromData($attachment["filecontent"], $attachment['filename'] ?? NULL, $attachment['filemime'] ?? NULL));
       }
     }
 
     // Headers.
     $src_headers = $message['headers'];
     $dest_headers = $email->getHeaders();
-
-    // Add in 'To' header which is stored directly in the message.
-    // @see \Drupal\Core\Mail\Plugin\Mail\PhpMail::mail()
-    if (isset($message['to'])) {
-      $src_headers['to'] = $message['to'];
-    }
 
     foreach ($src_headers as $name => $value) {
       $name = strtolower($name);
