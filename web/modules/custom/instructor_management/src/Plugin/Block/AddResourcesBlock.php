@@ -33,11 +33,17 @@ final class AddResourcesBlock extends BlockBase {
     $link2 = Link::fromTextAndUrl($this->t('View all homeworks'), $url2)->toRenderable();
     $link2['#attributes'] = ['class' => ['button', 'button--secondary']];
 
+    // Third link
+    $url3 = Url::fromRoute('instructor_management.questions_to_answer');
+    $link3 = Link::fromTextAndUrl($this->t('View all questions from students'), $url3)->toRenderable();
+    $link3['#attributes'] = ['class' => ['button', 'button--secondary']];
+
     // Add both links to the container
     $build['content'] = [
       '#type' => 'container',
       'link1' => $link1,
       'link2' => $link2,
+      'link3' => $link3,
     ];
 
     return $build;

@@ -12,7 +12,7 @@ function course_cleaner_cron() {
   $course_ids = \Drupal::entityQuery('node')
     ->condition('type', 'courses')
     ->accessCheck(true)
-    ->execute(); // Replace with your real field name.
+    ->execute();
   $courses = Node::loadMultiple($course_ids);
   $filtered_courses = array_filter($courses, fn($course) => $course->get('field_start_date')->value == $today_date);
   $filtered_course_ids = array_map(fn($course) => $course->id(), $filtered_courses);
@@ -30,5 +30,3 @@ function course_cleaner_cron() {
     }
   }
 }
-
-

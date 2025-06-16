@@ -16,3 +16,11 @@ themes_block.delete_theme:
 
 themes_block.themes:
   path: '/admin/content/themes'
+
+themes_block.update_theme:
+  path: '/admin/content/themes/update'
+  defaults:
+    _title: 'Update a theme'
+    _form: 'Drupal\themes_block\Form\UpdateThemeForm'
+  requirements:
+    _permission: 'access update theme form'

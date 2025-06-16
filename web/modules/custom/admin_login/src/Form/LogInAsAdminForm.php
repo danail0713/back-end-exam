@@ -41,12 +41,12 @@ final class LogInAsAdminForm extends FormBase {
     $form['name'] = [
       '#type' => 'textfield',
       '#title' => $this->t('Username'),
-      '#required' => TRUE,
+      '#required' => true,
     ];
     $form['pass'] = [
       '#type' => 'password',
       '#title' => $this->t('Password'),
-      '#required' => TRUE,
+      '#required' => true,
     ];
     $form['actions']['submit'] = [
       '#type' => 'submit',

@@ -4,6 +4,8 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\Core\Url as CoreUrl;
 use Drupal\file\FileInterface;
+use Drupal\node\Entity\Node;
+use Drupal\profile\Entity\ProfileInterface;
 use MongoDB\Client;
 
 /**
@@ -108,7 +110,9 @@ function student_enrollment_file_download($uri) {
       $previous_theme = $themes_array[$theme_index - 1];
       $previous_theme_id = $previous_theme['_id'];
     }
-    if (isUserEnrolled((int)$course_id) && $theme_index === 0) {
+    if (
+    (isUserEnrolled((int)$course_id) && ($theme_index === 0 || isUserHasHomework($previous_theme_id)))
+      || isUserCourseInstructor((int)$course_id)) {
       $headers = [
         'Content-Type' => $file->getMimeType(),
       ];
@@ -138,6 +142,29 @@ function isUserHasHomework($theme_id) {
   $mongo_client = new Client('mongodb://localhost:27017');
   $db = $mongo_client->getDatabase('test');
   $homework_responses = $db->getCollection('homeworks_responses');
-  $current_user_id = (string)\Drupal::currentUser()->id();
-  
+  $student_id = (string)\Drupal::currentUser()->id();
+  $homework_response = $homework_responses->findOne([
+    'student_id' => $student_id,
+    'responses' => [
+      '$elemMatch' => ['theme_id' => $theme_id, 'grade' => ['$gte' => 4.50]]
+    ]
+  ]);
+  return $homework_response ? true : false;
+}
+
+function isUserCourseInstructor($course_id) {
+    $current_user_id = \Drupal::currentUser()->id();
+    $profiles = \Drupal::entityTypeManager()
+      ->getStorage('profile')
+      ->loadByProperties(['uid' => $current_user_id, 'type' => 'instructor']);
+    $instructor_profile = reset($profiles);
+    $profile_phone = "";
+    if ($instructor_profile instanceof ProfileInterface) {
+      $profile_phone = trim($instructor_profile->get('field_mob')->value);
+    }
+    $course = Node::load($course_id);
+    $instructor_id = $course->get('field_instructor')->target_id;
+    $instructor_entity = Node::load($instructor_id);
+    $instructor_phone = trim($instructor_entity->get('field_phone')->value);
+    return $profile_phone == $instructor_phone;
 }

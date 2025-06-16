@@ -9,6 +9,7 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\Entity\Node;
 use MongoDB\Client;
+use MongoDB\BSON\ObjectId;
 
 /**
  * Provides a Themes form.
@@ -42,6 +43,16 @@ final class AddThemeForm extends FormBase {
       '#after_build' => [[get_class($this), 'hideTextFormatHelpText'],],
     ];
 
+    // Add Type selection field
+    $form['type'] = [
+      '#type' => 'select',
+      '#title' => $this->t('Type'),
+      '#options' => [
+        'lection' => $this->t('Lection'),
+        'exercise' => $this->t('Exercise'),
+      ],
+      '#required' => TRUE,
+    ];
 
     // Add Select List for Available Courses.
     $form['course_select'] = [
@@ -50,12 +61,14 @@ final class AddThemeForm extends FormBase {
       '#options' => $this->getAvailableCourses(),
       '#required' => TRUE,
     ];
+
     $form['submit'] = [
       '#type' => 'submit',
       '#value' => $this->t('Add theme'),
     ];
     return $form;
   }
+
   // Function to retrieve available courses.
   private function getAvailableCourses() {
     $query = \Drupal::entityQuery('node')
@@ -90,16 +103,8 @@ final class AddThemeForm extends FormBase {
    */
   public function validateForm(array &$form, FormStateInterface $form_state): void {
     // @todo Validate the form here.
-    // Example:
-    // @code
-    //   if (mb_strlen($form_state->getValue('message')) < 10) {
-    //     $form_state->setErrorByName(
-    //       'message',
-    //       $this->t('Message should be at least 10 characters.'),
-    //     );
-    //   }
-    // @endcode
   }
+
   /**
    * {@inheritdoc}
    */
@@ -107,16 +112,20 @@ final class AddThemeForm extends FormBase {
     // Get form values.
     $title = $form_state->getValue('title');
     $description = $form_state->getValue('description')['value'];
+    $type = $form_state->getValue('type');
     $course_id = $form_state->getValue('course_select');
     $selected_course = $form['course_select']['#options'][$course_id];
+
     // Connect to MongoDB.
     try {
       $client = new Client("mongodb://localhost:27017");
       $collection = $client->getDatabase('test')->getCollection('themes');
+
       // Prepare the document.
       $theme_data = [
         'title' => $title,
         'description' => $description,
+        'type' => $type,
         'course_id' => $course_id,
         'resources' => [],
         'homework' => "",

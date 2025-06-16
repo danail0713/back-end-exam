@@ -6,6 +6,10 @@ themes_block.add_theme:
   title: Add a theme
   route_name: themes_block.add_theme
   parent_id: themes_block.themes
+themes_block.update_theme:
+  title: Update a theme
+  route_name: themes_block.update_theme
+  parent_id: themes_block.themes
 themes_block.delete_theme:
   title: Delete themes
   route_name: themes_block.delete_theme

@@ -9,3 +9,7 @@ access add homework form:
 access view homeworks form:
   title: 'Access view homeworks form'
   description: 'Allows instructors to view all homeworks sent by students he/she teaches and to grade and write comments to the homeworks.'
+
+access questions to answer form:
+  title: 'Access questions to answer form'
+  description: 'Allows instructors access question to answer form and to give answers to the students.'

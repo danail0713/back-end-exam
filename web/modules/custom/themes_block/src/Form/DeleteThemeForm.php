@@ -8,7 +8,6 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\Entity\Node;
 use MongoDB\Client;
-use MongoDB\Database;
 
 /**
  * Provides a form to delete themes from a course.

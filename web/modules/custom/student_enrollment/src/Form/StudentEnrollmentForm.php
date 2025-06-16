@@ -1,6 +1,7 @@
 <?php
 
 namespace Drupal\student_enrollment\Form;
+
 use DateTime;
 use Drupal;
 use Drupal\Core\Form\FormBase;
@@ -48,8 +49,8 @@ class StudentEnrollmentForm extends FormBase {
       The 403 page is displaying.*/
     }
 
-     // Build the enrollment form elements here.
-     $course_name = Node::load($course_id)->label();
+    // Build the enrollment form elements here.
+    $course_name = Node::load($course_id)->label();
     $form['course'] = [
       '#type' => 'label',
       '#title' => $this->t('<h2>Enroll for the ' . $course_name . ' course</h2>'),
@@ -80,7 +81,6 @@ class StudentEnrollmentForm extends FormBase {
     $user_id = \Drupal::currentUser()->id();
     $course_id = $form_state->getValue('course_id');
     $course_start_date = new DateTime(Node::load($course_id)->get('field_start_date')->value);
-    $course_end_date = new DateTime(Node::load($course_id)->get('field_end_date')->value);
     $now_date = new DateTime();
 
     // Check if the user is already enrolled in the selected course.
@@ -90,10 +90,8 @@ class StudentEnrollmentForm extends FormBase {
         $this->recordEnrollment($user_id, $course_id);
         $this->messenger()->addMessage($this->t('Enrollment successfull.'));
         //$this->notificationService->sendEnrollmentNotification($user_id, $course_id); // send an email for successfull enrollment.
-      } else if ($now_date >= $course_start_date && $now_date <= $course_end_date) {
-        $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');
       } else {
-        $this->messenger()->addMessage($this->t("This course has already ended. You can't enroll for it."), 'warning');
+        $this->messenger()->addMessage($this->t("Enrollment time for this course has expired because it is after the start date."), 'warning');
       }
     } else {
       $this->messenger()->addMessage($this->t('You are already enrolled for this course.'), 'warning');

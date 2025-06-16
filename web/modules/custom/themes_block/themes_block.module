@@ -14,7 +14,7 @@ function themes_block_theme(): array {
   return [
     'themes' => [
       'variables' => ['themes' => NULL, 'user_enrolled' => NULL, 'user_course_instructor' => NULL,
-       'homework_form' => NULL, 'homework_response' => NULL],
+       'homework_form' => NULL, 'homework_response' => NULL, 'instructor_id' => NULL],
     ],
   ];
 }

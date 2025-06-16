@@ -51,7 +51,7 @@ class RegisterStudentForm extends FormBase {
       '#type' => 'password_confirm',
       '#required' => true,
       '#title' => null
-  ];
+    ];
 
     $form['phone'] = [
       '#type' => 'tel',
@@ -67,29 +67,9 @@ class RegisterStudentForm extends FormBase {
   }
 
   public function validateForm(array &$form, FormStateInterface $form_state) {
-    $username = $form_state->getValue('username');
     $first_name = $form_state->getValue('first_name');
     $last_name = $form_state->getValue('last_name');
-    $email = $form_state->getValue('email');
     $phone = $form_state->getValue('phone');
-    // Check if email or phone already exist
-    $existing_user_email = user_load_by_mail($email);
-    $existing_username = user_load_by_name($username);
-    $existing_profile = \Drupal::entityTypeManager()
-      ->getStorage('profile')
-      ->loadByProperties(['field_phone' => $phone, 'type' => 'student']);
-    // Validate username uniqueness
-    if ($existing_username) {
-      $form_state->setErrorByName('username', $this->t('This username is already taken.'));
-    }
-    if ($existing_user_email || !empty($existing_profile)) {
-      if ($existing_user_email) {
-        $form_state->setErrorByName('email', $this->t('An account with this email already exists.'));
-      }
-      if (!empty($existing_profile)) {
-        $form_state->setErrorByName('phone', $this->t('An account with this phone number already exists.'));
-      }
-    }
     // Validate first and last name
     if (!preg_match('/^[A-Za-z]{2,}$/', $first_name)) {
       $form_state->setErrorByName('first_name', $this->t('First name must be at least 2 letters and contain only letters.'));
@@ -97,6 +77,13 @@ class RegisterStudentForm extends FormBase {
 
     if (!preg_match('/^[A-Za-z]{2,}$/', $last_name)) {
       $form_state->setErrorByName('last_name', $this->t('Last name must be at least 2 letters and contain only letters.'));
+    }
+
+    $existing_profile = \Drupal::entityTypeManager()
+      ->getStorage('profile')
+      ->loadByProperties(['field_phone' => $phone, 'type' => 'student']);
+    if (!empty($existing_profile)) {
+      $form_state->setErrorByName('phone', $this->t('An account with this phone number already exists.'));
     }
   }
 

@@ -41,14 +41,6 @@ student_enrollment.most_enrolled_courses:
   requirements:
     _permission: 'access content'
 
-student_enrollment.config_emails:
-  path: '/config-emails'
-  defaults:
-    _title: 'Email Notifications'
-    _form: 'Drupal\student_enrollment\Form\NotificationConfigForm'
-  requirements:
-    _permission: 'access config form'
-
 student_enrollment.log_in_student:
   path: '/user/login/student'
   defaults:
@@ -56,3 +48,19 @@ student_enrollment.log_in_student:
     _form: 'Drupal\student_enrollment\Form\LogInAsStudentForm'
   requirements:
     _permission: 'access content'
+
+student_enrollment.ask_question:
+  path: '/ask-question'
+  defaults:
+    _title: 'Question'
+    _form: 'Drupal\student_enrollment\Form\QuestionForm'
+  requirements:
+    _permission: 'access ask question form'
+
+student_enrollment.question_responses:
+  path: '/question-responses'
+  defaults:
+    _title: 'Questions responses'
+    _controller: '\Drupal\student_enrollment\Controller\QuestionsResponsesController'
+  requirements:
+    _permission: 'access responses to questions'

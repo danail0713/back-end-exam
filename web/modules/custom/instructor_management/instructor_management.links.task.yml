@@ -6,6 +6,14 @@ instructor_management.add_resources:
   title: Add resources
   route_name: instructor_management.add_resources
   base_route: instructor_management.add_resources
+instructor_management.update_resources:
+  title: Update resources
+  route_name: instructor_management.update_resources
+  base_route: instructor_management.add_resources
+instructor_management.delete_resources:
+  title: Delete resources
+  route_name: instructor_management.delete_resources
+  base_route: instructor_management.add_resources
 instructor_management.add_homework:
   title: Add homework
   route_name: instructor_management.add_homework

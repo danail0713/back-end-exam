@@ -4,17 +4,35 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\node\Entity\Node;
 use Drupal\user\Entity\User;
 use Drupal\profile\Entity\Profile;
+use Drupal\Component\Utility\Random;
+use Drupal\Core\Form\FormStateInterface;
 
+
+function instructor_management_form_node_instructor_form_alter(&$form, FormStateInterface $form_state) {
+  $form['field_phone']['widget'][0]['value']['#element_validate'][] = function ($element, $form_state) {
+    if (\Drupal::entityQuery('profile')
+        ->condition('field_mob', $element['#value'])
+        ->condition('type', 'instructor')
+        ->accessCheck(FALSE)
+        ->count()
+        ->execute()) {
+      $form_state->setError($element, 'Instructor with this phone number already exists!');
+    }
+  };
+}
 /**
  * Implements hook_entity_presave() for nodes.
  */
 function instructor_management_node_presave(EntityInterface $entity) {
   if ($entity instanceof Node && $entity->bundle() == 'instructor') {
-    $first_name = trim($entity->get('field_first_name')->value);
-    $last_name = trim($entity->get('field_last_name')->value);
-    $entity->setTitle($first_name . ' ' . $last_name);
+   // $phone = trim($entity->get('field_phone')->value);
+
+      // Set the title
+      $first_name = trim($entity->get('field_first_name')->value);
+      $last_name = trim($entity->get('field_last_name')->value);
+      $entity->setTitle($first_name . ' ' . $last_name);
+    }
   }
-}
 
 /**
  * Implements hook_entity_insert() for nodes.
@@ -28,25 +46,56 @@ function instructor_management_node_insert(EntityInterface $entity) {
     $email = trim($entity->get('field_email')->value);
     $phone = trim($entity->get('field_phone')->value);
     $username = $first_name . $last_name;
-      // Create a new user.
-      $user = User::create([
-        'name' => $username,
-        'mail' => $email,
-        'pass' => strtolower($username),
-        'status' => 1, // Active user.
-        'roles' => ['instructor'], // Assign the instructor role.
-      ]);
-      $user->save();
-      $profile = Profile::create([
-        'type' => 'instructor', // Ensure this matches the profile type machine name.
-        'uid' => $user->id(),
-        'field_first_name' => $first_name,
-        'field_last_name' => $last_name,
-        'field_mob' => $phone,
-      ]);
-      $profile->save();
-    }
+
+    // 1. Генерирай сигурна парола.
+    $random = new Random();
+    $password = $random->string(16, true); // 16 символа, включително специални знаци
+
+    // 3. Създай нов потребител.
+    $user = User::create([
+      'name' => $username,
+      'mail' => $email,
+      'pass' => $password,
+      'status' => 1, // Active user.
+      'roles' => ['instructor'], // Assign the instructor role.
+    ]);
+    $user->save();
+
+    // 4. Създай профил.
+    $profile = Profile::create([
+      'type' => 'instructor',
+      'uid' => $user->id(),
+      'field_first_name' => $first_name,
+      'field_last_name' => $last_name,
+      'field_mob' => $phone,
+    ]);
+    $profile->save();
   }
+
+  // 2. Изпрати имейл до инструктора.
+  $mailManager = \Drupal::service('plugin.manager.mail');
+  $module = 'instructor_management';
+  $key = 'instructor_account_created';
+  $to = $email;
+  $params['subject'] = 'Вашият профил като преподавател е създаден';
+  $params['message'] = "Здравейте, $first_name $last_name,\n\n"
+    . "Вие бяхте добавен като преподавател в системата за обучение.\n"
+    . "Данни за достъп:\n"
+    . "Потребителско име: $username\n"
+    . "Парола: $password\n\n";
+  $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+  $send = true;
+  $mailManager->mail($module, $key, $to, $langcode, $params, NULL, $send);
+}
+
+function instructor_management_mail($key, &$message, $params) {
+  switch ($key) {
+    case 'instructor_account_created':
+      $message['subject'] = $params['subject'];
+      $message['body'][] = $params['message'];
+      break;
+  }
+}
 
 /**
  * Implements hook_theme().

@@ -6,7 +6,11 @@ view all student enrollments:
   title: 'View all student enrollments'
   description: 'Allows administrators to view and manage student enrollments.'
   restrict access: true
-access config form:
-  title: 'Access the email config form'
-  description: 'Allows access to a configuration form so the administrator can configure the list of emails that are going to be notified.'
+access ask question form:
+  title: 'Access ask question form'
+  description: 'Allows students to access ask question form.'
+  restrict access: true
+access responses to questions:
+  title: 'Access all responses to questions'
+  description: 'Allows students to view all responses to questions.'
   restrict access: true

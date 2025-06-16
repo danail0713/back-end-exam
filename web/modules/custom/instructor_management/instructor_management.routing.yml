@@ -29,3 +29,27 @@ instructor_management.view_homeworks:
     _form: 'Drupal\instructor_management\Form\ViewHomeworksForm'
   requirements:
     _permission: 'access view homeworks form'
+
+instructor_management.questions_to_answer:
+  path: '/questions-to-answer'
+  defaults:
+    _title: 'Questions To Answer'
+    _form: 'Drupal\instructor_management\Form\QuestionsToAnswerForm'
+  requirements:
+    _permission: 'access questions to answer form'
+
+instructor_management.update_resources:
+  path: '/update-resources'
+  defaults:
+    _title: 'Update Resourses'
+    _form: 'Drupal\instructor_management\Form\UpdateResourcesForm'
+  requirements:
+    _permission: 'access content'
+
+instructor_management.delete_resources:
+  path: '/delete-resources'
+  defaults:
+    _title: 'Delete Resources'
+    _form: 'Drupal\instructor_management\Form\DeleteResourcesForm'
+  requirements:
+    _permission: 'access content'

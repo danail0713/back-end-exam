@@ -36,12 +36,14 @@ final class ThemesBlock extends BlockBase {
     $themes = $this->getThemesFromMongoDB($current_node->id());
     $isUserEnrolled = $this->isUserEnrolled($current_node);
     $isUserCourseInstructor = $this->isCourseInstructor($current_node);
+    $instructor_id = $this->getInstructorId();
     $homework_form = \Drupal::formBuilder()->getForm('Drupal\themes_block\Form\UploadHomeworkForm');
     return [
       '#theme' => 'themes',
       '#themes' => $themes,
       '#user_enrolled' => $isUserEnrolled,
       '#user_course_instructor' => $isUserCourseInstructor,
+      '#instructor_id' => $instructor_id,
       '#homework_form' => $homework_form,
       '#cache' => ['max-age' => 0],
       '#attached' => [
@@ -50,6 +52,28 @@ final class ThemesBlock extends BlockBase {
         ],
       ],
     ];
+  }
+
+  private function getCurrentCourse() {
+    $current_course_id = \Drupal::routeMatch()->getRawParameter('node');
+    $current_course = Node::load($current_course_id);
+    return $current_course;
+  }
+
+  private function getInstructorId() {
+    $current_course = $this->getCurrentCourse();
+    $instructor_id = $current_course->get('field_instructor')->target_id;
+    $instructor_node = Node::load($instructor_id);
+    $instructor_mobile_number = $instructor_node->get('field_phone')->value;
+    $profiles = \Drupal::entityTypeManager()
+      ->getStorage('profile')
+      ->loadByProperties(['field_mob' => $instructor_mobile_number, 'type' => 'instructor']);
+    $instructor_profile = reset($profiles);
+    $instructor_id = "";
+    if ($instructor_profile instanceof ProfileInterface) {
+      $instructor_id = $instructor_profile->get('uid')->target_id;
+    }
+    return $instructor_id;
   }
 
   /**
@@ -63,23 +87,29 @@ final class ThemesBlock extends BlockBase {
     $index = 0;
     foreach ($documents as $document) {
       $theme_id = $document['_id'];
-      $student_grade = 0;
-      $student_comment = '';
       $isUserSubmittedHomework = $this->isUserSubmittedHomework($theme_id);
       $user_homework_response = $this->fetchUserHomeworkResponse($theme_id);
       $theme = [
+        'id' => (string)$theme_id,
         'title' => $document['title'] ?? '',
         'description' => $document['description'] ?? '',
         'resources' => [], // This is an array of file URLs
+        'type' => $document['type'],
         'homework' => $document['homework'],
         'submitted_homework' =>  $isUserSubmittedHomework,
         'homework_response' => $user_homework_response ? $user_homework_response : [],
         'accessResources' => $index == 0 // Only first theme is accessible in the beggining
       ];
       foreach ($document['resources'] as $resource_url) {
-        $resource_parts = explode('/', $resource_url);
-        $resource_name = $resource_parts[4];
-        $resource = ['name' => $resource_name, 'url' => $resource_url];
+
+        if(str_starts_with($resource_url, 'https://') || str_starts_with($resource_url, 'http://')) {
+          $resource = ['name' => $resource_url, 'url' => $resource_url];
+        }
+        else {
+          $resource_parts = explode('/', $resource_url);
+          $resource_name = end($resource_parts);
+          $resource = ['name' => $resource_name, 'url' => $resource_url];
+        }
         $theme['resources'][] = $resource;
       }
       $themes[] = $theme;
@@ -90,7 +120,7 @@ final class ThemesBlock extends BlockBase {
       if ($themes[$i]['homework_response']) {
         $grade = $themes[$i]['homework_response']['grade'];
         if ($grade >= 4.50) {
-          $themes[$i+1]['accessResources'] = true;
+          $themes[$i + 1]['accessResources'] = true;
         }
       }
     }

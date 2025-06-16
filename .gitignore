@@ -38,8 +38,8 @@ web/*:*@*:*
 # */settings*.php
 
 # Ignore paths that contain user-generated content.
-# */files
-# */private
+*/files
+web/sites/default/files/private
 
 # Ignore SimpleTest multi-site environment.
 # simpletest

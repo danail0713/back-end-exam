@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\custom_footer\Plugin\Block;
 
 use Drupal\Core\Block\BlockBase;
-use Drupal\Core\Form\FormStateInterface;
 
 /**
  * Provides a footer bottom content block.

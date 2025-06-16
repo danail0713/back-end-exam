@@ -2,3 +2,11 @@ access add theme form:
   title: 'Access add theme form.'
   description: 'Allows administrators access the add theme form.'
   restrict access: true
+access update theme form:
+  title: 'Access update theme form.'
+  description: 'Allows administrators access the update theme form.'
+  restrict access: true
+access delete theme form:
+  title: 'Access delete theme form.'
+  description: 'Allows administrators access the delete theme form.'
+  restrict access: true

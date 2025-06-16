@@ -6,7 +6,14 @@
 				<li class="theme-item">
 					<div class="theme-header">
 						<span class="theme-number">{{ loop.index }}.</span>
-						<span class="theme-title">{{ theme.title }}</span>
+						<span class="theme-title">
+							{{ theme.title }}
+							{% if theme.type is defined and theme.type %}
+								-
+								{{ theme.type|capitalize }}
+							{% endif %}
+						</span>
+
 						<button class="toggle-btn" aria-expanded="false" aria-controls="theme-content-{{ loop.index }}">+</button>
 					</div>
 					<div class="theme-body" id="theme-content-{{ loop.index }}">
@@ -47,7 +54,8 @@
 								<p>{{ 'No homework yet.'|t }}</p>
 							{% endif %}
 						{% elseif theme.homework_response is not empty and theme.homework_response.grade < 4.50 %}
-							<h4>{{ 'Homework grade:'|t }} {{ theme.homework_response.grade }}</h4>
+							<h4>{{ 'Homework grade:'|t }}
+								{{ theme.homework_response.grade }}</h4>
 							<h4>{{ 'Homework comment:'|t }}</h4>
 							{{ theme.homework_response.comment }}
 							{% if theme.homework != 'no homeworks accepted' %}
@@ -58,10 +66,16 @@
 							{% endif %}
 						</div>
 					{% elseif theme.homework_response is not empty and theme.homework_response.grade >= 4.50 %}
-						<h4>{{ 'Homework grade:'|t }} {{ theme.homework_response.grade }}</h4>
+						<h4>{{ 'Homework grade:'|t }}
+							{{ theme.homework_response.grade }}</h4>
 						<h4>{{ 'Homework comment:'|t }}</h4>
 						{{ theme.homework_response.comment }}
 						<h5>{{ 'You can access the resources from the next lection.'|t }}</h5>
+					{% endif %}
+					{% if user_enrolled %}
+						<a href="{{ path('student_enrollment.ask_question', {'theme_id': theme.id, 'instructor_id': instructor_id}) }}" class="button button--secondary homework-submit-btn">
+							Ask a question
+						</a>
 					{% endif %}
 				</li>
 			{% endfor %}
@@ -77,4 +91,3 @@
 		padding: 4px 12px;
 	}
 </style>
-

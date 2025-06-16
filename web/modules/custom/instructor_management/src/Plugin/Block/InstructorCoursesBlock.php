@@ -43,20 +43,16 @@ final class InstructorCoursesBlock extends BlockBase {
       ->getStorage('profile')
       ->loadByProperties(['uid' => $current_user_id, 'type' => 'instructor']);
     $instructor_profile = reset($profiles);
-    $profile_name = '';
+    $profile_phone = '';
     if ($instructor_profile instanceof ProfileInterface) {
-      $first_name = trim($instructor_profile->get('field_first_name')->value);
-      $last_name = trim($instructor_profile->get('field_last_name')->value);
-      $profile_name = "$first_name $last_name";
+      $profile_phone = trim($instructor_profile->get('field_mob')->value);
     }
     $courses = Node::loadMultiple($course_ids);
-    $instructor_courses = array_filter($courses, function ($course) use ($profile_name) {
+    $instructor_courses = array_filter($courses, function ($course) use ($profile_phone) {
       $instructor_id = $course->get('field_instructor')->target_id;
       $instructor_entity = Node::load($instructor_id);
-      $first_name = trim($instructor_entity->get('field_first_name')->value);
-      $last_name = trim($instructor_entity->get('field_last_name')->value);
-      $full_name = "$first_name $last_name";
-      return $profile_name == $full_name;
+      $instructor_phone = trim($instructor_entity->get('field_phone')->value);
+      return $profile_phone == $instructor_phone;
     });
     return $instructor_courses;
   }
