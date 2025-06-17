@@ -100,17 +100,17 @@ final class AddHomeworkForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state): void {
-      $theme_id =  $form_state->getValue('theme');
-      $homework_text = $form_state->getValue('homework');
-      $client = new Client("mongodb://localhost:27017");
-      $collection = $client->getDatabase('test')->getCollection('themes');
+    $theme_id =  $form_state->getValue('theme');
+    $homework_text = $form_state->getValue('homework');
+    $client = new Client("mongodb://localhost:27017");
+    $collection = $client->getDatabase('test')->getCollection('themes');
 
-      $collection->updateOne(
-        ['_id' => new ObjectId($theme_id)],
-        ['$set' => ['homework' => $homework_text]]
-      );
+    $collection->updateOne(
+      ['_id' => new ObjectId($theme_id)],
+      ['$set' => ['homework' => $homework_text]]
+    );
 
-      $this->messenger()->addStatus($this->t('Homework added successfully.'));
+    $this->messenger()->addStatus($this->t('Homework added successfully.'));
   }
 
   /**
@@ -121,30 +121,22 @@ final class AddHomeworkForm extends FormBase {
       ->condition('type', 'courses')
       ->accessCheck(true)
       ->execute();
-
     $current_user_id = \Drupal::currentUser()->id();
     $profiles = \Drupal::entityTypeManager()
       ->getStorage('profile')
       ->loadByProperties(['uid' => $current_user_id, 'type' => 'instructor']);
     $instructor_profile = reset($profiles);
-
-    $profile_name = '';
+    $profile_phone = '';
     if ($instructor_profile instanceof ProfileInterface) {
-      $first_name = trim($instructor_profile->get('field_first_name')->value);
-      $last_name = trim($instructor_profile->get('field_last_name')->value);
-      $profile_name = "$first_name $last_name";
+      $profile_phone = trim($instructor_profile->get('field_mob')->value);
     }
-
     $courses = Node::loadMultiple($course_ids);
-    $instructor_courses = array_filter($courses, function ($course) use ($profile_name) {
+    $instructor_courses = array_filter($courses, function ($course) use ($profile_phone) {
       $instructor_id = $course->get('field_instructor')->target_id;
       $instructor_entity = Node::load($instructor_id);
-      $first_name = trim($instructor_entity->get('field_first_name')->value);
-      $last_name = trim($instructor_entity->get('field_last_name')->value);
-      $full_name = "$first_name $last_name";
-      return $profile_name === $full_name;
+      $instructor_phone = trim($instructor_entity->get('field_phone')->value);
+      return $profile_phone == $instructor_phone;
     });
-
     $courses_rendered = [];
     foreach ($instructor_courses as $course) {
       $courses_rendered[$course->id()] = $course->label();

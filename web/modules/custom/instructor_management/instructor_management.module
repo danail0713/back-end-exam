@@ -6,16 +6,17 @@ use Drupal\user\Entity\User;
 use Drupal\profile\Entity\Profile;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Form\FormStateInterface;
-
+use Drupal\file\FileInterface;
 
 function instructor_management_form_node_instructor_form_alter(&$form, FormStateInterface $form_state) {
   $form['field_phone']['widget'][0]['value']['#element_validate'][] = function ($element, $form_state) {
     if (\Drupal::entityQuery('profile')
-        ->condition('field_mob', $element['#value'])
-        ->condition('type', 'instructor')
-        ->accessCheck(FALSE)
-        ->count()
-        ->execute()) {
+      ->condition('field_mob', $element['#value'])
+      ->condition('type', 'instructor')
+      ->accessCheck(FALSE)
+      ->count()
+      ->execute()
+    ) {
       $form_state->setError($element, 'Instructor with this phone number already exists!');
     }
   };
@@ -25,14 +26,14 @@ function instructor_management_form_node_instructor_form_alter(&$form, FormState
  */
 function instructor_management_node_presave(EntityInterface $entity) {
   if ($entity instanceof Node && $entity->bundle() == 'instructor') {
-   // $phone = trim($entity->get('field_phone')->value);
+    // $phone = trim($entity->get('field_phone')->value);
 
-      // Set the title
-      $first_name = trim($entity->get('field_first_name')->value);
-      $last_name = trim($entity->get('field_last_name')->value);
-      $entity->setTitle($first_name . ' ' . $last_name);
-    }
+    // Set the title
+    $first_name = trim($entity->get('field_first_name')->value);
+    $last_name = trim($entity->get('field_last_name')->value);
+    $entity->setTitle($first_name . ' ' . $last_name);
   }
+}
 
 /**
  * Implements hook_entity_insert() for nodes.

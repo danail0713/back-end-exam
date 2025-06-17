@@ -70,7 +70,7 @@ final class ViewHomeworksForm extends FormBase {
         foreach ($document['homeworks_to_check'] as $index => $homework) {
           $student_id = $homework['student_id'];
           $file_url = $homework['file_url'];
-          $file_name = explode('/', $file_url)[5];
+          $file_name = end(explode('/', $file_url));
           $profiles  = \Drupal::entityTypeManager()
             ->getStorage('profile')
             ->loadByProperties(['uid' => $student_id, 'type' => 'student']);

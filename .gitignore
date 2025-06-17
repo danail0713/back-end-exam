@@ -21,8 +21,6 @@ vendor/
 web/sites/*/settings*.php
 web/sites/*/services*.yml
 
-# Ignore paths that contain user-generated content.
-web/sites/*/private
 # Ignore SimpleTest multi-site environment.
 web/sites/simpletest
 

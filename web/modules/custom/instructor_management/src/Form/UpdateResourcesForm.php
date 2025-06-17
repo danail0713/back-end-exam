@@ -91,11 +91,8 @@ final class UpdateResourcesForm extends FormBase {
       ];
 
       if ($current_type === 'file') {
-        // If original is file, show its name; if original is url, show nothing
         $file_name = '';
         if ($original_type === 'file') {
-          $parts = explode('/', $resource);
-          $file_name = end($parts);
         }
         $form['resources_fieldset'][$i]['file'] = [
           '#type' => 'managed_file',
