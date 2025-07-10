@@ -6,6 +6,9 @@ use Drupal\tmgmt\TranslatorInterface;
 
 /**
  * A service for managing DeepL glossary API batch.
+ *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryApiBatch instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
  */
 class DeeplGlossaryApiBatch implements DeeplGlossaryApiBatchInterface {
 

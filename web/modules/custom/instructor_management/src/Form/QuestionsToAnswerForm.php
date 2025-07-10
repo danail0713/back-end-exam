@@ -50,7 +50,7 @@ final class QuestionsToAnswerForm extends FormBase {
 
     $form['questions'] = [
       '#type' => 'table',
-      '#header' => ['Student', 'Theme', 'Question', 'Response'],
+      '#header' => [$this->t('Student'), $this->t('Theme'), $this->t('Question'), $this->t('Response')],
       '#empty' => $this->t('No questions from students.'),
       '#attributes' => [
         'class' => ['views-table', 'views-view-table'], // Drupal-style classes

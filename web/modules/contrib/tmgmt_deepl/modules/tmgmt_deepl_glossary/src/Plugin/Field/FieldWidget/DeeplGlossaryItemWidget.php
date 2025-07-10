@@ -28,14 +28,14 @@ class DeeplGlossaryItemWidget extends WidgetBase {
     // Subject.
     $element['subject'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Subject'),
+      '#title' => $this->t('Source text'),
       '#default_value' => $item->subject ?? NULL,
     ];
 
     // Definition.
     $element['definition'] = [
       '#type' => 'textfield',
-      '#title' => $this->t('Definition'),
+      '#title' => $this->t('Target text'),
       '#default_value' => $item->definition ?? NULL,
     ];
 

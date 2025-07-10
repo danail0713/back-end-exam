@@ -21,6 +21,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Form controller for deepl_glossary edit forms.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryForm instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ingroup tmgmt_deepl_glossary
  */
 class DeeplGlossaryForm extends ContentEntityForm {

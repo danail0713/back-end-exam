@@ -34,6 +34,6 @@ class DeeplFreeTranslator extends DeeplTranslator {
    *
    * @var string
    */
-  protected string $translatorGlossaryUrl = 'https://api-free.deepl.com/v2/glossaries';
+  protected string $translatorGlossaryUrl = 'https://api-free.deepl.com/v3/glossaries';
 
 }

@@ -10,6 +10,7 @@ use Drupal\node\Entity\Node;
 use Drupal\profile\Entity\ProfileInterface;
 use MongoDB\BSON\ObjectId;
 use MongoDB\Client;
+use MongoDB\Model\BSONDocument;
 
 /**
  * Provides a themes block.
@@ -38,6 +39,7 @@ final class ThemesBlock extends BlockBase {
     $isUserCourseInstructor = $this->isCourseInstructor($current_node);
     $instructor_id = $this->getInstructorId();
     $homework_form = \Drupal::formBuilder()->getForm('Drupal\themes_block\Form\UploadHomeworkForm');
+
     return [
       '#theme' => 'themes',
       '#themes' => $themes,
@@ -77,45 +79,82 @@ final class ThemesBlock extends BlockBase {
   }
 
   /**
-   * Fetch themes data from MongoDB.
+   * Fetch themes data from MongoDB based on current language.
    */
   private function getThemesFromMongoDB($courseId) {
     $client = new Client('mongodb://localhost:27017');
-    $collection = $client->getDatabase('test')->getCollection('themes');
-    $documents = $collection->find(['course_id' => $courseId])->toArray();
+    $db = $client->getDatabase('test');
+
+    $current_language = \Drupal::languageManager()->getCurrentLanguage()->getId();
+    $is_bulgarian = ($current_language == 'bg');
+
+    $documents = [];
+
+    if ($is_bulgarian) {
+      // Fetch Bulgarian themes
+      $collection = $db->getCollection('themes_bg');
+      $bson_docs = $collection->find(['course_id' => $courseId])->toArray();
+      $documents = array_map(function (BSONDocument $doc) {
+        return (array) $doc;
+      }, $bson_docs);
+
+      \Drupal::logger('themes_block')->info('Found @count Bulgarian themes for course @courseId', [
+        '@count' => count($documents),
+        '@courseId' => $courseId
+      ]);
+    } else {
+      // Fetch English themes
+      $collection = $db->getCollection('themes');
+      $bson_docs = $collection->find(['course_id' => $courseId])->toArray();
+      $documents = array_map(function (BSONDocument $doc) {
+        return (array) $doc;
+      }, $bson_docs);
+    }
+
     $themes = [];
     $index = 0;
+
     foreach ($documents as $document) {
-      $theme_id = $document['_id'];
+      $theme_id = '';
+      if ($is_bulgarian) {
+        $theme_id = $document['original_theme_id'];
+      } else {
+        $theme_id = $document['_id'];
+      }
       $isUserSubmittedHomework = $this->isUserSubmittedHomework($theme_id);
       $user_homework_response = $this->fetchUserHomeworkResponse($theme_id);
+
       $theme = [
         'id' => (string)$theme_id,
         'title' => $document['title'] ?? '',
         'description' => $document['description'] ?? '',
-        'resources' => [], // This is an array of file URLs
-        'type' => $document['type'],
-        'homework' => $document['homework'],
-        'submitted_homework' =>  $isUserSubmittedHomework,
+        'resources' => [],
+        'type' => $document['type'] ?? '',
+        'homework' => $document['homework'] ?? '',
+        'submitted_homework' => $isUserSubmittedHomework,
         'homework_response' => $user_homework_response ? $user_homework_response : [],
-        'accessResources' => $index == 0 // Only first theme is accessible in the beggining
+        'accessResources' => $index == 0, // Only first theme is accessible initiall
       ];
-      foreach ($document['resources'] as $resource_url) {
 
-        if(str_starts_with($resource_url, 'https://') || str_starts_with($resource_url, 'http://')) {
-          $resource = ['name' => $resource_url, 'url' => $resource_url];
+      // Process resources
+      if (isset($document['resources'])) {
+        foreach ($document['resources'] as $resource_url) {
+          if (str_starts_with($resource_url, 'https://') || str_starts_with($resource_url, 'http://')) {
+            $resource = ['name' => $resource_url, 'url' => $resource_url];
+          } else {
+            $resource_parts = explode('/', $resource_url);
+            $resource_name = end($resource_parts);
+            $resource = ['name' => $resource_name, 'url' => $resource_url];
+          }
+          $theme['resources'][] = $resource;
         }
-        else {
-          $resource_parts = explode('/', $resource_url);
-          $resource_name = end($resource_parts);
-          $resource = ['name' => $resource_name, 'url' => $resource_url];
-        }
-        $theme['resources'][] = $resource;
       }
+
       $themes[] = $theme;
       $index++;
     }
 
+    // Set access permissions based on homework grades
     for ($i = 0; $i < count($themes) - 1; $i++) {
       if ($themes[$i]['homework_response']) {
         $grade = $themes[$i]['homework_response']['grade'];
@@ -185,7 +224,8 @@ final class ThemesBlock extends BlockBase {
     if ($homework_response && $homework_response['responses']) {
       foreach ($homework_response['responses'] as $response) {
         if ($response['theme_id'] == $theme_id) {
-          $student_info = ['grade' => $response['grade'], 'comment' => $response['comment']];
+          $formatted_grade = number_format($response['grade'], 2, '.', '');
+          $student_info = ['grade' => $formatted_grade, 'comment' => $response['comment']];
           break;
         }
       }

@@ -27,6 +27,7 @@
         "drupal/custom_breadcrumbs": "^1.1",
         "drupal/devel": "^5.0",
         "drupal/easy_breadcrumb": "^2.0",
+        "drupal/erd": "^2.0",
         "drupal/field_validation": "^1.1",
         "drupal/jquery_ui": "^1.7",
         "drupal/jquery_ui_resizable": "^2.1",
@@ -43,7 +44,8 @@
         "drupal/tmgmt_deepl": "^2.2",
         "drupal/webform": "^6.2",
         "drush/drush": "^13.3",
-        "mongodb/mongodb": "^1.21"
+        "mongodb/mongodb": "^1.21",
+        "stichoza/google-translate-php": "^5.3"
     },
     "conflict": {
         "drupal/drupal": "*"
@@ -53,10 +55,11 @@
     "config": {
         "allow-plugins": {
             "composer/installers": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true,
             "drupal/core-composer-scaffold": true,
             "drupal/core-project-message": true,
-            "phpstan/extension-installer": true,
-            "dealerdirect/phpcodesniffer-composer-installer": true
+            "php-http/discovery": true,
+            "phpstan/extension-installer": true
         },
         "sort-packages": true
     },

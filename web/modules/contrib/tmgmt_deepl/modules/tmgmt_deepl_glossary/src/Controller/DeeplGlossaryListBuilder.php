@@ -8,6 +8,9 @@ use Drupal\Core\Entity\EntityListBuilder;
 /**
  * Provides a list controller for deepl_glossary entity.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryListBuilder instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ingroup tmgmt_deepl_glossary
  */
 class DeeplGlossaryListBuilder extends EntityListBuilder {

@@ -1,0 +1,15 @@
+name: Entity Relationship Diagrams
+description: 'Provides dynamic entity relationship diagrams for all of your Drupal entities.'
+type: module
+core_version_requirement: ^9.4 || ^10 || ^11
+configure: erd.settings
+dependencies:
+  - 'jquery_ui:jquery_ui'
+  - 'jquery_ui_menu:jquery_ui_menu'
+  - 'jquery_ui_autocomplete:jquery_ui_autocomplete'
+  - 'jquery_ui_resizable:jquery_ui_resizable'
+
+# Information added by Drupal.org packaging script on 2024-04-24
+version: '2.0.0'
+project: 'erd'
+datestamp: 1713953313

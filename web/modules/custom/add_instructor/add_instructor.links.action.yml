@@ -1,6 +1,6 @@
 add_instructor.add_instructor:
  route_name: node.add
- title: "Add an instructor"
+ title: "Добави инструктор"
  appears_on:
    - "view.instructors.instructors"
  route_parameters:

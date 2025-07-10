@@ -12,6 +12,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Provides a form for syncing deepl_glossary entries.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryFetchForm instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ingroup tmgmt_deepl_glossary
  */
 class DeeplGlossarySyncForm extends ConfirmFormBase {

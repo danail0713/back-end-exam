@@ -1,7 +1,7 @@
-tmgmt_deepl_glossary.sync_form:
-  path: '/admin/tmgmt/deepl_glossaries/sync'
+tmgmt_deepl_glossary.fetch_form:
+  path: '/admin/tmgmt/deepl_glossaries/fetch'
   defaults:
-    _form: 'Drupal\tmgmt_deepl_glossary\Form\DeeplGlossarySyncForm'
+    _form: 'Drupal\tmgmt_deepl_glossary\Form\DeeplMultilingualGlossaryFetchForm'
   options:
     _admin_route: TRUE
   requirements:

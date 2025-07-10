@@ -7,7 +7,7 @@ dependencies:
 type: module
 configure: 'view.tmgmt_deepl_glossary.page_1'
 
-# Information added by Drupal.org packaging script on 2025-05-22
-version: '2.2.11'
+# Information added by Drupal.org packaging script on 2025-06-13
+version: '2.2.12'
 project: 'tmgmt_deepl'
-datestamp: 1747912167
+datestamp: 1749799117

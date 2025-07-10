@@ -1,11 +1,17 @@
-tmgmt_deepl_glossary.link_add:
-  route_name: entity.deepl_glossary.add_form
+tmgmt_deepl_glossary.link_glossary_add:
+  route_name: entity.deepl_ml_glossary.add_form
   title: 'Add DeepL glossary'
   appears_on:
-    - entity.deepl_glossary.collection
+    - entity.deepl_ml_glossary.collection
 
-tmgmt_deepl_glossary.link_sync:
-  route_name: tmgmt_deepl_glossary.sync_form
-  title: 'Sync DeepL glossaries'
+tmgmt_deepl_glossary.link_glossary_definition_add:
+  route_name: entity.deepl_ml_glossary_dictionary.add_form
+  title: 'Add dictionary'
   appears_on:
-    - entity.deepl_glossary.collection
+    - entity.deepl_ml_glossary.edit_form
+
+tmgmt_deepl_glossary.link_glossary_fetch:
+  route_name: tmgmt_deepl_glossary.fetch_form
+  title: 'Fetch DeepL glossaries'
+  appears_on:
+    - entity.deepl_ml_glossary.collection

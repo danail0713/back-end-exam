@@ -7,6 +7,9 @@ use Drupal\views\EntityViewsData;
 
 /**
  * Provides the views data for the tmgmt_deepl_glossary entity type.
+ *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryViewsData instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
  */
 class DeeplGlossaryViewsData extends EntityViewsData {
 

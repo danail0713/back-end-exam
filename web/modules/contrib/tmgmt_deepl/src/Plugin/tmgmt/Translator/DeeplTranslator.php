@@ -322,6 +322,8 @@ abstract class DeeplTranslator extends TranslatorPluginBase implements Container
       'EN-US' => 'EN',
       'PT-BR' => 'PT',
       'PT-PT' => 'PT',
+      'ZH-HANS' => 'ZH',
+      'ZH-HANT' => 'ZH',
     ];
 
     if (isset($language_mapping[$source_lang])) {
@@ -340,6 +342,7 @@ abstract class DeeplTranslator extends TranslatorPluginBase implements Container
 
     // Allow alteration of hasCheckoutSettings.
     $this->moduleHandler->alter('tmgmt_deepl_has_checkout_settings', $has_checkout_settings, $job);
+    assert(is_bool($has_checkout_settings));
 
     return $has_checkout_settings;
   }
@@ -374,11 +377,14 @@ abstract class DeeplTranslator extends TranslatorPluginBase implements Container
       'User-Agent' => 'tmgmt_deepl/2.2.x',
     ];
 
+    // Fix source language mapping.
+    $source_lang = is_string($query_params['source_lang']) ? static::fixSourceLanguageMappings($query_params['source_lang']) : NULL;
+
     // Prepare the data array.
     $data = [
       'formality' => $translator->getSetting('formality'),
       'preserve_formatting' => (bool) $translator->getSetting('preserve_formatting'),
-      'source_lang' => $query_params['source_lang'] ?? NULL,
+      'source_lang' => $source_lang,
       'split_sentences' => $translator->getSetting('split_sentences'),
       'tag_handling' => $translator->getSetting('tag_handling'),
       'target_lang' => $query_params['target_lang'] ?? NULL,
@@ -411,8 +417,8 @@ abstract class DeeplTranslator extends TranslatorPluginBase implements Container
     \Drupal::moduleHandler()->alter('tmgmt_deepl_query_string', $job, $data, $query_params);
 
     // Encode the data array to JSON.
-    /** @var string $json_data */
     $json_data = json_encode($data);
+    assert(is_string($json_data));
 
     // Perform translate request with basic retry logic.
     // Define retry settings.

@@ -91,7 +91,6 @@ final class UpdateResourcesForm extends FormBase {
       ];
 
       if ($current_type === 'file') {
-        $file_name = '';
         if ($original_type === 'file') {
         }
         $form['resources_fieldset'][$i]['file'] = [

@@ -10,7 +10,7 @@
 							{{ theme.title }}
 							{% if theme.type is defined and theme.type %}
 								-
-								{{ theme.type|capitalize }}
+								{{ theme.type|capitalize|t }}
 							{% endif %}
 						</span>
 
@@ -55,39 +55,45 @@
 							{% endif %}
 						{% elseif theme.homework_response is not empty and theme.homework_response.grade < 4.50 %}
 							<h4>{{ 'Homework grade:'|t }}
+								{{ theme.homework_response.grade }}
+								<h4>{{ 'Homework comment:'|t }}</h4>
+								{{ theme.homework_response.comment }}
+								{% if theme.homework != 'no homeworks accepted' %}
+									<h5>{{ 'Send homework again for a higher grade.'|t }}</h5>
+									{{ homework_form }}
+								{% else %}
+									<p>{{ 'The time for sending homeworks has expired.'|t }}</p>
+								{% endif %}
+							</div>
+						{% elseif theme.homework_response is not empty and theme.homework_response.grade >= 4.50 %}
+							<h4>{{ 'Homework grade:'|t }}
 								{{ theme.homework_response.grade }}</h4>
 							<h4>{{ 'Homework comment:'|t }}</h4>
 							{{ theme.homework_response.comment }}
-							{% if theme.homework != 'no homeworks accepted' %}
-								<h5>{{ 'Send homework again for a higher grade.'|t }}</h5>
-								{{ homework_form }}
+							{% if theme.homework_response.grade == 6.00 %}
+								<h5>{{ 'You can access the resources from the next lection'}}</h5>
 							{% else %}
-								<p>{{ 'The time for sending homeworks has expired.'|t }}</p>
+								<h5>{{ 'You can access the resources from the next lection but you can still send your homework for a higher grade.'|t }}</h5>
+                {{ homework_form }}
 							{% endif %}
-						</div>
-					{% elseif theme.homework_response is not empty and theme.homework_response.grade >= 4.50 %}
-						<h4>{{ 'Homework grade:'|t }}
-							{{ theme.homework_response.grade }}</h4>
-						<h4>{{ 'Homework comment:'|t }}</h4>
-						{{ theme.homework_response.comment }}
-						<h5>{{ 'You can access the resources from the next lection.'|t }}</h5>
-					{% endif %}
-					{% if user_enrolled %}
-						<a href="{{ path('student_enrollment.ask_question', {'theme_id': theme.id, 'instructor_id': instructor_id}) }}" class="button button--secondary homework-submit-btn">
-							Ask a question
-						</a>
-					{% endif %}
-				</li>
-			{% endfor %}
-		{% else %}
-			<p>{{ 'No themes found.'|t }}</p>
-		{% endif %}
-	</ol>
-</div>
+						{% endif %}
+						{% if user_enrolled %}
+							<a href="{{ path('student_enrollment.ask_question', {'theme_id': theme.id, 'instructor_id': instructor_id}) }}" class="button button--secondary homework-submit-btn">
+								{{ 'Ask a question'|t }}
+							</a>
+						{% endif %}
+					</li>
+				{% endfor %}
+			{% else %}
+				<p>{{ 'No themes found.'|t }}</p>
+			{% endif %}
+		</ol>
+	</div>
 
-<style>
-	.homework-submit-btn {
-		font-size: 1rem;
-		padding: 4px 12px;
-	}
-</style>
+
+	<style>
+		.homework-submit-btn {
+			font-size: 1rem;
+			padding: 4px 12px;
+		}
+	</style>

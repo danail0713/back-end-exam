@@ -1,0 +1,1 @@
+{"_id":{"$oid":"6819ca170cb6b3a83ab9ebdb"},"instructor_id":"5","theme_id":{"$oid":"67f00510b01650f3ee0df6a5"},"homeworks_to_check":[{"student_id":"2","file_url":"/system/files/homeworks/Tasks_1.zip"},{"student_id":"23","file_url":"/system/files/homeworks/MyTasks.rar"}]}

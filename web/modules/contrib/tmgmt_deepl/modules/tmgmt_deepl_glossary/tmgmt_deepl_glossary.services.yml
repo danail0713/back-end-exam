@@ -2,5 +2,15 @@ services:
   tmgmt_deepl_glossary.api:
     class: Drupal\tmgmt_deepl_glossary\DeeplGlossaryApi
     arguments: ['@entity_type.manager', '@http_client', '@messenger']
+  tmgmt_deepl_glossary.ml.api:
+    class: Drupal\tmgmt_deepl_glossary\DeeplMultilingualGlossaryApi
+    arguments: [ '@entity_type.manager', '@http_client', '@messenger' ]
   tmgmt_deepl_glossary.api_batch:
     class: Drupal\tmgmt_deepl_glossary\DeeplGlossaryApiBatch
+  tmgmt_deepl_glossary.ml.api_batch:
+    class: Drupal\tmgmt_deepl_glossary\DeeplMultilingualGlossaryApiBatch
+  tmgmt_deepl_glossary.ml.route_subscriber:
+    class: Drupal\tmgmt_deepl_glossary\EventSubscriber\DeeplMultilingualGlossaryRouteSubscriber
+    arguments: ['@messenger', '@state']
+    tags:
+      - { name: event_subscriber }

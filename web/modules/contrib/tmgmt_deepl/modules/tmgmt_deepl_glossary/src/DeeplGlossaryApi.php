@@ -14,6 +14,9 @@ use Psr\Http\Message\ResponseInterface;
 
 /**
  * A service for managing DeepL glossary API calls.
+ *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryApi instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
  */
 class DeeplGlossaryApi implements DeeplGlossaryApiInterface {
 

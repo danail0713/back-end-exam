@@ -41,24 +41,6 @@ function student_enrollment_schema() {
 }
 
 /**
- * Implements hook_form_FORM_ID_alter().
- */
-function student_enrollment_form_user_login_form_alter(&$form, FormStateInterface $form_state, $form_id) {
-  // Add reset password link.
-  $url_object = CoreUrl::fromRoute('user.pass');
-  $form['password_reset_link'] = [
-    '#type' => 'link',
-    '#url' => $url_object,
-    '#title' => new TranslatableMarkup('Forgot your password?'),
-    '#attributes' => [
-      'class' => ['user-reset-password-link'],
-    ],
-  ];
-}
-
-
-
-/**
  * Implements hook_theme().
  */
 function student_enrollment_theme() {

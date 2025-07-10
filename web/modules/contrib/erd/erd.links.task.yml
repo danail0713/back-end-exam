@@ -1,0 +1,10 @@
+erd.admin:
+  route_name: erd.admin
+  title: 'Create'
+  base_route: erd.admin
+
+erd.settings:
+  route_name: erd.settings
+  title: 'Settings'
+  description: 'Configure how the diagrams will be generated and output'
+  base_route: erd.admin

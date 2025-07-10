@@ -15,6 +15,9 @@ use Drupal\user\EntityOwnerTrait;
 /**
  * Defines the DeepL glossary entity.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use deepl_ml_glossary entity instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ContentEntityType(
  *   id = "deepl_glossary",
  *   label = @Translation("DeepL glossary"),
@@ -43,12 +46,6 @@ use Drupal\user\EntityOwnerTrait;
  *     "ready" = "ready",
  *     "uid" = "uid",
  *   },
- *   links = {
- *     "add-form" = "/admin/tmgmt/deepl_glossaries/add",
- *     "edit-form" = "/admin/tmgmt/deepl_glossaries/manage/{deepl_glossary}/edit",
- *     "delete-form" = "/admin/tmgmt/deepl_glossaries/manage/{deepl_glossary}/delete",
- *     "collection" = "/admin/tmgmt/deepl_glossaries",
- *   }
  * )
  */
 class DeeplGlossary extends ContentEntityBase implements DeeplGlossaryInterface {

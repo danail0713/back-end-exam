@@ -7,8 +7,6 @@ use Drupal;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\node\Entity\Node;
-use Drupal\student_enrollment\Services\NotificationService;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
@@ -16,26 +14,12 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
  */
 class StudentEnrollmentForm extends FormBase {
 
-  // inject the notification service in the form class.
-  protected $notificationService;
-
-  public function __construct(NotificationService $notificationService) {
-    $this->notificationService = $notificationService;
-  }
-
-  public static function create(ContainerInterface $container) {
-    return new static(
-      $container->get('student_enrollment.notify')
-    );
-  }
-
   /**
    * {@inheritdoc}
    */
   public function getFormId() {
     return 'student_enrollment_student_enrollment';
   }
-
 
   /**
    * {@inheritdoc}
@@ -53,7 +37,7 @@ class StudentEnrollmentForm extends FormBase {
     $course_name = Node::load($course_id)->label();
     $form['course'] = [
       '#type' => 'label',
-      '#title' => $this->t('<h2>Enroll for the ' . $course_name . ' course</h2>'),
+      '#title' => '<h2>' . $this->t('Enroll for the course') . " " . $course_name . '</h2>',
     ];
     $form['course_id'] = [
       '#type' => 'hidden',
@@ -85,7 +69,7 @@ class StudentEnrollmentForm extends FormBase {
 
     // Check if the user is already enrolled in the selected course.
     if (!$this->isUserEnrolled($user_id, $course_id)) {
-      if ($now_date < $course_start_date) {
+      if ($now_date > $course_start_date) {
         // Record the enrollment.
         $this->recordEnrollment($user_id, $course_id);
         $this->messenger()->addMessage($this->t('Enrollment successfull.'));

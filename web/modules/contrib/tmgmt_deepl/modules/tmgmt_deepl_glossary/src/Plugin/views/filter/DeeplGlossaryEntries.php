@@ -11,6 +11,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Filter entries for deepl_glossary.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15 since it's obsolete.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ingroup views_filter_handlers
  *
  * @ViewsFilter("tmgmt_deepl_glossary_entries")

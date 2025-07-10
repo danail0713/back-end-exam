@@ -6,6 +6,7 @@ namespace Drupal\student_enrollment\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use MongoDB\Client;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Displays student questions and instructor responses.
@@ -16,9 +17,12 @@ final class QuestionsResponsesController extends ControllerBase {
    * Displays all answered questions for the current student.
    */
   public function __invoke(): array {
-    $current_user = $this->currentUser();
-    $student_id = $current_user->id();
 
+    $current_user = $this->currentUser();
+    if (in_array('administrator', $current_user->getRoles())) {
+      throw new AccessDeniedHttpException();
+    }
+    $student_id = $current_user->id();
     $mongo = new Client("mongodb://localhost:27017");
     $database = $mongo->getDatabase('test');
     $responses_collection = $database->getCollection('questions_responses');

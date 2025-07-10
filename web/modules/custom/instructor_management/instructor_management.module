@@ -6,28 +6,12 @@ use Drupal\user\Entity\User;
 use Drupal\profile\Entity\Profile;
 use Drupal\Component\Utility\Random;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\file\FileInterface;
 
-function instructor_management_form_node_instructor_form_alter(&$form, FormStateInterface $form_state) {
-  $form['field_phone']['widget'][0]['value']['#element_validate'][] = function ($element, $form_state) {
-    if (\Drupal::entityQuery('profile')
-      ->condition('field_mob', $element['#value'])
-      ->condition('type', 'instructor')
-      ->accessCheck(FALSE)
-      ->count()
-      ->execute()
-    ) {
-      $form_state->setError($element, 'Instructor with this phone number already exists!');
-    }
-  };
-}
 /**
  * Implements hook_entity_presave() for nodes.
  */
 function instructor_management_node_presave(EntityInterface $entity) {
   if ($entity instanceof Node && $entity->bundle() == 'instructor') {
-    // $phone = trim($entity->get('field_phone')->value);
-
     // Set the title
     $first_name = trim($entity->get('field_first_name')->value);
     $last_name = trim($entity->get('field_last_name')->value);
@@ -40,7 +24,7 @@ function instructor_management_node_presave(EntityInterface $entity) {
  */
 function instructor_management_node_insert(EntityInterface $entity) {
   // Ensure this is an Instructor node.
-  if ($entity instanceof Node && $entity->bundle() === 'instructor') {
+  if ($entity instanceof Node && $entity->bundle() == 'instructor') {
     // Get instructor details.
     $first_name = trim($entity->get('field_first_name')->value);
     $last_name = trim($entity->get('field_last_name')->value);
@@ -71,22 +55,22 @@ function instructor_management_node_insert(EntityInterface $entity) {
       'field_mob' => $phone,
     ]);
     $profile->save();
-  }
 
-  // 2. Изпрати имейл до инструктора.
-  $mailManager = \Drupal::service('plugin.manager.mail');
-  $module = 'instructor_management';
-  $key = 'instructor_account_created';
-  $to = $email;
-  $params['subject'] = 'Вашият профил като преподавател е създаден';
-  $params['message'] = "Здравейте, $first_name $last_name,\n\n"
-    . "Вие бяхте добавен като преподавател в системата за обучение.\n"
-    . "Данни за достъп:\n"
-    . "Потребителско име: $username\n"
-    . "Парола: $password\n\n";
-  $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-  $send = true;
-  $mailManager->mail($module, $key, $to, $langcode, $params, NULL, $send);
+    // 2. Изпрати имейл до инструктора.
+    $mailManager = \Drupal::service('plugin.manager.mail');
+    $module = 'instructor_management';
+    $key = 'instructor_account_created';
+    $to = $email;
+    $params['subject'] = 'Вашият профил като преподавател е създаден';
+    $params['message'] = "Здравейте, $first_name $last_name,\n\n"
+      . "Вие бяхте добавен като преподавател в системата за обучение.\n"
+      . "Данни за достъп:\n"
+      . "Потребителско име: $username\n"
+      . "Парола: $password\n\n";
+    $langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
+    $send = true;
+    $mailManager->mail($module, $key, $to, $langcode, $params, NULL, $send);
+  }
 }
 
 function instructor_management_mail($key, &$message, $params) {
@@ -107,4 +91,54 @@ function instructor_management_theme(): array {
       'variables' => ['instructor_courses' => NULL],
     ],
   ];
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function instructor_management_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  // Check if this is the instructor profile edit form
+  if ($form_id == 'profile_instructor_edit_form') {
+    // Add custom submit handler
+    $form['actions']['submit']['#submit'][] = 'instructor_management_instructor_profile_submit';
+  }
+}
+
+/**
+ * Custom submit handler for instructor profile form.
+ */
+function instructor_management_instructor_profile_submit($form, FormStateInterface $form_state) {
+  // Get current user
+  $current_user = \Drupal::currentUser();
+  $email = $current_user->getEmail();
+  // Get form values
+  $first_name = $form_state->getValue('field_first_name')[0]['value'] ?? '';
+  $last_name = $form_state->getValue('field_last_name')[0]['value'] ?? '';
+  $mobile_number = $form_state->getValue('field_mob')[0]['value'] ?? '';
+  $user_entity = User::load($current_user->id());
+  $username = $first_name . $last_name;
+  $user_entity->setUsername($username);
+  $user_entity->save();
+  $current_langcode = \Drupal::languageManager()->getCurrentLanguage()->getId();
+  // Find instructor content node associated with this user
+  $query = \Drupal::entityQuery('node')
+    ->condition('type', 'instructor')
+    ->condition('field_email', $email)
+    ->accessCheck(false);
+
+  $nids = $query->execute();
+
+  if (!empty($nids)) {
+    $nid = reset($nids);
+    $node = Node::load($nid);
+    if ($node->hasTranslation($current_langcode)) {
+      $translated_node = $node->getTranslation($current_langcode);
+      // Update the instructor node fields
+      $translated_node->set('field_first_name', $first_name);
+      $translated_node->set('field_last_name', $last_name);
+      $translated_node->set('field_phone', $mobile_number);
+      $translated_node->save();
+    }
+    \Drupal::messenger()->addMessage(t('Instructor username is already @name', ['@name' => $username]));
+  }
 }

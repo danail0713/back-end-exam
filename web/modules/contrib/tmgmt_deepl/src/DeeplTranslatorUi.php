@@ -175,10 +175,6 @@ class DeeplTranslatorUi extends TranslatorPluginUiBase {
       ],
     ];
 
-    // Allow alteration of buildConfigurationForm.
-    // @phpstan-ignore-next-line
-    \Drupal::moduleHandler()->alter('tmgmt_deepl_build_configuration_form', $form, $form_state);
-
     return $form;
   }
 
@@ -219,6 +215,8 @@ class DeeplTranslatorUi extends TranslatorPluginUiBase {
     // Allow alteration of checkoutSettingsForm.
     // @phpstan-ignore-next-line
     \Drupal::moduleHandler()->alter('tmgmt_deepl_checkout_settings_form', $form, $job);
+    assert(is_array($form));
+    assert($job instanceof JobInterface);
 
     if (!Element::children($form)) {
       $form['#description'] = $this->t("The @translator translator doesn't provide any checkout settings.", [

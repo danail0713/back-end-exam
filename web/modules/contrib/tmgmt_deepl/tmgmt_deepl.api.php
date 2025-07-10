@@ -5,7 +5,6 @@
  * Hooks provided by the tmgmt_deepl module.
  */
 
-use Drupal\Core\Form\FormStateInterface;
 use Drupal\tmgmt\Entity\Job;
 use Drupal\tmgmt\JobInterface;
 
@@ -20,20 +19,6 @@ use Drupal\tmgmt\JobInterface;
 function hook_tmgmt_deepl_checkout_settings_form_alter(array &$form, JobInterface $job): void {
   $form['additional_info'] = [
     '#markup' => t('Additional information shown in checkoutSettingsForm'),
-  ];
-}
-
-/**
- * Modify the DeeplTranslatorUi buildConfigurationForm.
- *
- * @param array $form
- *   The form array.
- * @param \Drupal\Core\Form\FormStateInterface $form_state
- *   The current state of the form.
- */
-function hook_tmgmt_deepl_build_configuration_form_alter(array &$form, FormStateInterface $form_state): void {
-  $form['additional_info'] = [
-    '#markup' => t('Additional information shown in buildConfigurationForm'),
   ];
 }
 

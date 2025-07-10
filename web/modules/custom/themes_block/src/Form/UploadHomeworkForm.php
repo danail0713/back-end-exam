@@ -122,7 +122,9 @@ final class UploadHomeworkForm extends FormBase {
 
   private function getThemeId() {
     $mongo_client = new Client('mongodb://localhost:27017');
-    $themes_collection = $mongo_client->getDatabase('test')->getCollection('themes');
+    $current_language = \Drupal::languageManager()->getCurrentLanguage()->getId();
+    $db = $mongo_client->getDatabase('test');
+    $themes_collection = ($current_language == 'en') ? $db->getCollection('themes') : $db->getCollection('themes_bg');
     $course_id = $this->getCurrentCourse()->id();
     $theme = $themes_collection->findOne([
       'course_id' => $course_id,
@@ -132,6 +134,6 @@ final class UploadHomeworkForm extends FormBase {
             ]
         ]
     ]);
-    return $theme['_id'];
+    return ($current_language == 'en') ? $theme['_id'] : $theme['original_theme_id'];
   }
 }

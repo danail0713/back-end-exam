@@ -26,7 +26,7 @@ final class AdminProfileViewController extends ControllerBase {
       $build['content'] = [
         '#type' => 'markup',
         '#cache' => ['max-age' => 0],
-        '#markup' => '<h2>'.$admin_username.'</h2><a href="' . $edit_url . '">Edit</a>',
+        '#markup' => '<h2>'.$admin_username.'</h2><a href="' . $edit_url . '">'. $this->t('Edit').'</a>',
       ];
       return $build;
     } else {

@@ -39,15 +39,19 @@ final class ViewHomeworksForm extends FormBase {
 
     $instructor_id = $current_user->id();
     $mongo = new Client("mongodb://localhost:27017");
-    $collection = $mongo->getDatabase('test')->getCollection('homeworks');
+    $db = $mongo->getDatabase('test');
+    $collection = $db->getCollection('homeworks');
     $document = $collection->findOne(['instructor_id' => $instructor_id]);
-    $themes_collection = $mongo->getDatabase('test')->getCollection('themes');
-    $theme_name = $themes_collection->findOne(['_id' => $document['theme_id']])['title'];
-
+    $current_language = \Drupal::languageManager()->getCurrentLanguage()->getId();
+    $themes_collection = ($current_language == 'en') ? $db->getCollection('themes') : $db->getCollection('themes_bg');
+    $id_key = ($current_language == 'en') ? '_id' : 'original_theme_id';
+    $theme_name = $themes_collection->findOne([$id_key => $document['theme_id']])['title'];
     $form['homeworks'] = [
       '#type' => 'table',
-      '#header' => ['First Name', 'Last Name', 'File', 'Grade', 'Comment'],
-      '#caption' => $this->t("<h3>Homeworks to check for the theme $theme_name.</h3>"),
+      '#header' => [$this->t('First Name'), $this->t('Last Name'), $this->t('File'), $this->t('Grade'), $this->t('Comment')],
+      '#caption' => [
+        '#markup' => '<h3>' . $this->t('Homeworks to check for the theme') . ' ' . $theme_name . '</h3>',
+      ],
       '#empty' => $this->t('No homeworks to check.'),
       '#attributes' => [
         'class' => ['views-table', 'views-view-table'], // Drupal-style classes
@@ -64,7 +68,7 @@ final class ViewHomeworksForm extends FormBase {
       $theme_id = $document['theme_id'];
       $form['theme_id'] = [
         '#type' => 'hidden',
-        '#value' => (string) $theme_id,
+        '#value' => (string)$theme_id,
       ];
       if ($document['homeworks_to_check']) {
         foreach ($document['homeworks_to_check'] as $index => $homework) {
@@ -168,26 +172,43 @@ final class ViewHomeworksForm extends FormBase {
           ],
           ['upsert' => true]
         );
+
+        // 2. Pull from homeworks_to_check array
+        $homeworks_collection->updateOne(
+          ['instructor_id' => $instructor_id],
+          [
+            '$pull' => [
+              'homeworks_to_check' => [
+                'student_id' => $student_id,
+              ]
+            ]
+          ]
+        );
       }
       if ($stop_check_homeworks == 1) {
-        $collection = $database->getCollection('themes');
+        $current_language = \Drupal::languageManager()->getCurrentLanguage()->getId();
+        $collection = ($current_language == 'en') ? $database->getCollection('themes') : $database->getCollection('themes_bg');
+        $id_key = ($current_language == 'en') ? '_id' : 'original_theme_id';
         $collection->updateOne(
-          ['_id' => new ObjectId($theme_id)],
+          [$id_key => new ObjectId($theme_id)],
           ['$set' => ['homework' => 'no homeworks accepted']]
+        );
+        // 1. Upsert to homework_responses
+        $responses_collection->updateOne(
+          ['student_id' => $student_id],
+          [
+            '$push' => [
+              'responses' => [
+                'theme_id' => new ObjectId($theme_id),
+                'grade' => $grade,
+                'comment' => $comment,
+              ]
+            ]
+          ],
+          ['upsert' => true]
         );
         \Drupal::messenger()->addMessage('No more homeworks will be sent for this theme.');
       }
-      // 2. Pull from homeworks_to_check array
-      $homeworks_collection->updateOne(
-        ['instructor_id' => $instructor_id],
-        [
-          '$pull' => [
-            'homeworks_to_check' => [
-              'student_id' => $student_id,
-            ]
-          ]
-        ]
-      );
     }
   }
 }

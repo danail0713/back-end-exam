@@ -17,6 +17,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * Provides a form for deleting a deepl_glossary entity.
  *
+ * @deprecated in tmgmt_deepl:2.2.12 and is removed from tmgmt_deepl:2.2.15. Use DeeplMultilingualGlossaryDeleteForm instead.
+ * @see https://www.drupal.org/project/tmgmt_deepl/issues/3522010
+ *
  * @ingroup tmgmt_deepl_glossary
  */
 class DeeplGlossaryDeleteForm extends ContentEntityConfirmFormBase {
